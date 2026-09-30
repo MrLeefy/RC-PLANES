@@ -23,7 +23,7 @@ func _init(t := "", sz := Vector2(92, 64)) -> void:
 func _input(event: InputEvent) -> void:
 	# _gui_input may stop receiving this pointer after it leaves the control.
 	if event is InputEventScreenTouch and event.index == _idx and (event.canceled or not event.pressed):
-		var local := get_global_transform_with_canvas().affine_inverse() * event.position
+		var local: Vector2 = get_global_transform_with_canvas().affine_inverse() * (event as InputEventScreenTouch).position
 		_finish_touch(not event.canceled and is_visible_in_tree() and Rect2(Vector2.ZERO, size).grow(12).has_point(local))
 		get_viewport().set_input_as_handled()
 

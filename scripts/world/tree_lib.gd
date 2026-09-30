@@ -10,27 +10,29 @@ static var _mats: Dictionary = {}
 static func leaf_texture(kind: String) -> ImageTexture:
 	if _leaf_textures.has(kind):
 		return _leaf_textures[kind]
-	var sz := 256
+	var sz := 512
 	var img := Image.create(sz, sz, false, Image.FORMAT_RGBA8)
-	img.fill(Color(0, 0, 0, 0))
+	img.fill(Color(0.1, 0.16, 0.06, 0))
 	var rng := RandomNumberGenerator.new()
 	rng.seed = hash(kind)
-	var count := 110 if kind == "broad" else (320 if kind == "needle" else 240)
+	var count := 150 if kind == "broad" else (520 if kind == "needle" else 340)
+	# Back-to-front: darker, deeper leaves first so lit leaves overlap them (reads as volume).
 	for k in count:
-		var cx := rng.randf_range(0.12, 0.88) * sz
-		var cy := rng.randf_range(0.12, 0.88) * sz
-		# denser toward the centre of the card
+		var cx := rng.randf_range(0.10, 0.90) * sz
+		var cy := rng.randf_range(0.10, 0.90) * sz
 		var dcen := Vector2(cx - sz * 0.5, cy - sz * 0.5).length() / (sz * 0.5)
-		if dcen > 0.97 or rng.randf() < dcen * 0.35:
+		if dcen > 0.96 or rng.randf() < dcen * 0.3:
 			continue
 		var ang := rng.randf() * TAU
-		var L := rng.randf_range(10.0, 18.0) if kind == "broad" else (rng.randf_range(5.0, 9.0) if kind == "small" else rng.randf_range(10.0, 20.0))
-		var W := L * (0.45 if kind != "needle" else 0.2)
-		var shade := rng.randf_range(0.6, 1.0)
-		var col := Color(shade * 0.85, shade, shade * 0.7, 1.0)
+		var L := rng.randf_range(20.0, 34.0) if kind == "broad" else (rng.randf_range(10.0, 17.0) if kind == "small" else rng.randf_range(24.0, 44.0))
+		var W := L * (0.46 if kind != "needle" else 0.07)
+		var depth := float(k) / count   # later = nearer the viewer = brighter
+		var shade := lerpf(0.55, 1.0, depth) * rng.randf_range(0.88, 1.08)
+		var hue := rng.randf_range(-0.06, 0.06)
+		var col := Color(shade * (0.80 + hue), shade * (1.0 - hue * 0.4), shade * (0.62 - hue), 1.0)
 		var ca := cos(ang)
 		var sa := sin(ang)
-		var r := int(ceil(L))
+		var r := int(ceil(L)) + 1
 		for yy in range(-r, r + 1):
 			for xx in range(-r, r + 1):
 				var u := xx * ca + yy * sa
@@ -40,17 +42,22 @@ static func leaf_texture(kind: String) -> ImageTexture:
 					var px := int(cx) + xx
 					var py := int(cy) + yy
 					if px >= 0 and py >= 0 and px < sz and py < sz:
-						var vein := 1.0 - 0.18 * exp(-v * v * 2.0)
-						var edge := clampf((1.0 - e) * 3.0, 0.0, 1.0)
-						img.set_pixel(px, py, Color(col.r * vein * (0.85 + 0.15 * edge), col.g * vein, col.b * vein, 1.0))
+						var rib := exp(-v * v / (W * W * 0.02)) * 0.22
+						var along := clampf((u / L) * 0.5 + 0.5, 0.0, 1.0)
+						var lit := 0.88 + 0.16 * along
+						var a := clampf((1.0 - e) * 6.0, 0.0, 1.0)
+						var c2 := Color(col.r * lit + rib * 0.5, col.g * lit + rib * 0.6, col.b * lit + rib * 0.2, a)
+						var old := img.get_pixel(px, py)
+						if a >= old.a or a > 0.6:
+							img.set_pixel(px, py, c2)
 	# twigs
-	for k in 6:
+	for k in 8:
 		var a0 := Vector2(sz * 0.5, sz * 0.5)
 		var ang2 := rng.randf() * TAU
-		for t in range(0, int(sz * 0.4)):
+		for t in range(0, int(sz * 0.38)):
 			var p := a0 + Vector2(cos(ang2), sin(ang2)) * t
 			if p.x >= 0 and p.y >= 0 and p.x < sz and p.y < sz and img.get_pixelv(p).a < 0.5:
-				img.set_pixelv(p, Color(0.25, 0.2, 0.14, 1.0))
+				img.set_pixelv(p, Color(0.22, 0.17, 0.11, 1.0))
 	img.generate_mipmaps()
 	var tex := ImageTexture.create_from_image(img)
 	_leaf_textures[kind] = tex
@@ -199,6 +206,8 @@ static func make(species: String, seed_i: int, far := false) -> Dictionary:
 				upv = Vector3.UP
 			var nrm := (pos - cen).normalized().lerp(Vector3.UP, 0.25).normalized()
 			var shade := clampf(0.55 + 0.45 * ((pos.y - cen.y) / maxf(rad, 0.1) * 0.5 + 0.5), 0.3, 1.0)
+			# inner leaves sit in shadow; outer leaves catch the sky (cheap baked occlusion)
+			shade *= lerpf(0.62, 1.0, clampf((pos - cen).length() / maxf(rad, 0.1), 0.0, 1.0))
 			var col := Color(shade, shade, shade, 1.0)
 			var h := cs * 0.5
 			var p0 := pos - right * h - upv * h

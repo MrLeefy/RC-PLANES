@@ -1,10 +1,10 @@
 shader_type spatial;
-render_mode cull_disabled, diffuse_lambert_wrap, specular_schlick_ggx;
+render_mode cull_disabled, diffuse_lambert_wrap, specular_schlick_ggx, alpha_to_coverage;
 #include "res://shaders/common.gdshaderinc"
 global uniform vec2 wind_dir;
 global uniform float wind_strength;
 global uniform float wind_gust;
-uniform sampler2D leaf_tex : source_color, filter_linear_mipmap, repeat_disable;
+uniform sampler2D leaf_tex : source_color, filter_linear_mipmap_anisotropic, repeat_disable;
 uniform vec3 tint_a : source_color = vec3(0.35, 0.5, 0.2);
 uniform vec3 tint_b : source_color = vec3(0.25, 0.4, 0.15);
 uniform float sway = 1.0;
@@ -28,7 +28,8 @@ void fragment() {
 	vec3 tint = mix(tint_a, tint_b, vari) * (0.85 + 0.3 * COLOR.r);
 	ALBEDO = t.rgb * tint;
 	ALPHA = t.a;
-	ALPHA_SCISSOR_THRESHOLD = 0.45;
+	ALPHA_ANTIALIASING_EDGE = 0.35;
+	ALPHA_TEXTURE_COORDINATE = UV * vec2(512.0, 512.0);
 	ROUGHNESS = 0.75;
 	SPECULAR = 0.3;
 	BACKLIGHT = ALBEDO * 0.55;

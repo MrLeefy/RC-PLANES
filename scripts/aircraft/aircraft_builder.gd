@@ -440,8 +440,9 @@ func _build_fuselage() -> void:
 	var st: Array = d["fuselage"]
 	var z0 := float(st[0][0])
 	var z1 := float(st[st.size() - 1][0])
-	var segs := 24 if lod_detail >= 1 else 12
-	var nrows := 44 if lod_detail >= 1 else 16
+	# Livery is painted per vertex, so a denser loft keeps stripes and camo edges crisp.
+	var segs := 40 if lod_detail >= 2 else (24 if lod_detail >= 1 else 12)
+	var nrows := 110 if lod_detail >= 2 else (44 if lod_detail >= 1 else 16)
 	var core := int(cidx["fuselage"])
 	var tail := _add_comp("tail_boom", core, "fuselage", 0.9, true)
 	var nose := -1
@@ -628,10 +629,10 @@ func _needs_flip(sf: Dictionary) -> bool:
 ## kind "main" (LE included, closed with a cut face at u1), "ctrl" (hinge face at u0, TE at u1)
 func _surface_piece(kit: MeshKit, sf: Dictionary, s0: float, s1: float, u0: float, u1: float, zone: String,
 		cap0: bool, cap1: bool, tip_round := false) -> void:
-	var nsp := maxi(2, int(ceil((s1 - s0) * float(sf["half"]) / 0.05)) + 1)
+	var nsp := maxi(2, int(ceil((s1 - s0) * float(sf["half"]) / (0.03 if lod_detail >= 2 else 0.05))) + 1)
 	if lod_detail == 0:
 		nsp = 2
-	var ncs := 10 if lod_detail >= 1 else 5
+	var ncs := 20 if lod_detail >= 2 else (10 if lod_detail >= 1 else 5)
 	var flip := _needs_flip(sf)
 	var col := _pfn(zone)
 	var loops := []  # per span station: full loop points (for caps)
@@ -1955,7 +1956,7 @@ func _fracture_pair(parent: int, child: int, loop: PackedVector3Array, normal: V
 	if loop.size() < 3: return
 	var center := _centroid(loop)
 	var nodes: Array = []
-	for side in [1.0, -1.0]:
+	for side: float in [1.0, -1.0]:
 		var k := MeshKit.new()
 		var inward := normal * (-side)
 		var rim := PackedVector3Array()

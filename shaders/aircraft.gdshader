@@ -64,8 +64,8 @@ void fragment() {
 		vec3 rq = fract(q * 7.0) - 0.5;
 		riv = (1.0 - smoothstep(0.08, 0.14, length(rq.xz))) * max(1.0 - smoothstep(0.0, 0.03, d.x), 1.0 - smoothstep(0.0, 0.03, d.z)) * panel_lines;
 		if (kind == 4) {
-			m = mix(0.92, 0.0, paint);
-			r = mix(0.20 + pv * 0.12, 0.42, paint);
+			m = mix(0.78, 0.0, paint);
+			r = mix(0.34 + pv * 0.12, 0.42, paint);
 			base *= mix(0.92 + pv * 0.12, 1.0, paint);
 		} else {
 			r = rough + (pv - 0.5) * 0.08;

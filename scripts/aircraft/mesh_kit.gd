@@ -83,7 +83,7 @@ func add_grid(rows: Array, closed: bool, color_fn: Callable, lod := true, flip_n
 	# indices (winding follows the chosen normal side)
 	var full_rows := range(R)
 	var full_cols := range(CC)
-	_emit_grid(idx, base, CC, full_rows, full_cols, flip_n)
+	_emit_grid(idx, base, CC, full_rows, full_cols, flip_n, color_fn)
 	if lod:
 		_emit_grid(lod1, base, CC, _decimate(R, 2), _decimate(CC, 2), flip_n)
 		if lod_levels >= 2:
@@ -103,7 +103,7 @@ func _decimate(n: int, step: int) -> Array:
 		return [0, n - 1]
 	return out
 
-func _emit_grid(list: PackedInt32Array, base: int, cc: int, rsel: Array, csel: Array, rev := false) -> void:
+func _emit_grid(list: PackedInt32Array, base: int, cc: int, rsel: Array, csel: Array, rev := false, refine_fn := Callable()) -> void:
 	for a in range(rsel.size() - 1):
 		var i0: int = rsel[a]
 		var i1: int = rsel[a + 1]
@@ -116,11 +116,55 @@ func _emit_grid(list: PackedInt32Array, base: int, cc: int, rsel: Array, csel: A
 			var v11 := base + i1 * cc + j1
 			# outward normal = cross(dj, di): triangle (v00, v01, v10) has right-hand normal (dj x di)
 			if rev:
-				_tri(list, v00, v10, v01)
-				_tri(list, v01, v10, v11)
+				_tri_refined(list, v00, v10, v01, refine_fn)
+				_tri_refined(list, v01, v10, v11, refine_fn)
 			else:
-				_tri(list, v00, v01, v10)
-				_tri(list, v01, v11, v10)
+				_tri_refined(list, v00, v01, v10, refine_fn)
+				_tri_refined(list, v01, v11, v10, refine_fn)
+
+## Livery is painted per vertex. Where neighbouring vertices carry very different paint
+## (a stripe or camo edge crosses the triangle) the triangle is split into a small
+## barycentric lattice and re-painted, so the edge resolves crisply instead of smearing or
+## stair-stepping. Sub-vertices lie exactly on the parent triangle, so no cracks appear.
+const REFINE_K := 6
+const REFINE_THRESHOLD := 0.06
+
+func _col_dist(a: Color, b: Color) -> float:
+	return absf(a.r - b.r) + absf(a.g - b.g) + absf(a.b - b.b) + absf(a.a - b.a) * 0.5
+
+func _tri_refined(list: PackedInt32Array, a: int, b: int, c: int, refine_fn: Callable) -> void:
+	if not refine_fn.is_valid():
+		_tri(list, a, b, c)
+		return
+	var ca := cols[a]
+	var cb := cols[b]
+	var cc2 := cols[c]
+	if maxf(_col_dist(ca, cb), maxf(_col_dist(cb, cc2), _col_dist(ca, cc2))) < REFINE_THRESHOLD:
+		_tri(list, a, b, c)
+		return
+	var k := REFINE_K
+	var grid := {}
+	for i in range(k + 1):
+		for j in range(k + 1 - i):
+			var w0 := float(k - i - j) / k
+			var w1 := float(i) / k
+			var w2 := float(j) / k
+			if i == 0 and j == 0:
+				grid[Vector2i(i, j)] = a
+			elif i == k:
+				grid[Vector2i(i, j)] = b
+			elif j == k:
+				grid[Vector2i(i, j)] = c
+			else:
+				var pos := verts[a] * w0 + verts[b] * w1 + verts[c] * w2
+				var nrm := (norms[a] * w0 + norms[b] * w1 + norms[c] * w2).normalized()
+				var uv := uvs[a] * w0 + uvs[b] * w1 + uvs[c] * w2
+				grid[Vector2i(i, j)] = _add_v(pos, nrm, refine_fn.call(pos, nrm), uv)
+	for i in range(k):
+		for j in range(k - i):
+			_tri(list, grid[Vector2i(i, j)], grid[Vector2i(i + 1, j)], grid[Vector2i(i, j + 1)])
+			if i + j < k - 1:
+				_tri(list, grid[Vector2i(i + 1, j)], grid[Vector2i(i + 1, j + 1)], grid[Vector2i(i, j + 1)])
 
 ## Flat polygon fan cap. ring ordered; normal given explicitly (outward).
 func add_cap(center: Vector3, ring: PackedVector3Array, n: Vector3, color_fn: Callable, detail := false) -> void:
