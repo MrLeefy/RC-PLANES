@@ -1,0 +1,44 @@
+name: Import RC Park source
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "_bootstrap/RC_Park_0.10.0_Source.zip.b64"
+
+permissions:
+  contents: write
+
+jobs:
+  import-source:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Decode and unpack source
+        shell: bash
+        run: |
+          set -euo pipefail
+          base64 -d _bootstrap/RC_Park_0.10.0_Source.zip.b64 > /tmp/rcpark.zip
+          rm -rf /tmp/rcpark-src
+          mkdir -p /tmp/rcpark-src
+          unzip -q /tmp/rcpark.zip -d /tmp/rcpark-src
+          test -f /tmp/rcpark-src/rcpark/project.godot
+          cp -a /tmp/rcpark-src/rcpark/. .
+          rm -rf _bootstrap
+          rm -f .github/workflows/import-rcpark-source.yml
+          rmdir .github/workflows 2>/dev/null || true
+          rmdir .github 2>/dev/null || true
+
+      - name: Commit full project
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "Import RC Park 0.10.0 full Godot project"
+          git push origin HEAD:main
