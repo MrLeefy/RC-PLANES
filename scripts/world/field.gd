@@ -998,3 +998,310 @@ func _build_trees_async(progress: Callable) -> void:
 	for gkey in groups.keys():
 		var arr: Array = groups[gkey]
 		var parts := String(gkey).split("|")
+		var species := parts[1]
+		var vi := int(parts[2])
+		var near_v := _variant(species, vi, false)
+		var far_v := _variant(species, vi, true)
+		var center := Vector3.ZERO
+		for pl in arr:
+			center += pl[2]
+		center /= arr.size()
+		for lod in [0, 1]:
+			var mm := MultiMesh.new()
+			mm.transform_format = MultiMesh.TRANSFORM_3D
+			mm.mesh = (near_v if lod == 0 else far_v)["mesh"]
+			mm.instance_count = arr.size()
+			for k in arr.size():
+				var pl: Array = arr[k]
+				var xf := Transform3D(Basis(Vector3.UP, float(pl[3])).scaled(Vector3.ONE * float(pl[4])), (pl[2] as Vector3) - center)
+				mm.set_instance_transform(k, xf)
+			var mmi := MultiMeshInstance3D.new()
+			mmi.multimesh = mm
+			mmi.position = center
+			if lod == 0:
+				near_tree_nodes.append(mmi)
+				mmi.visibility_range_end = 340.0
+				mmi.visibility_range_end_margin = 40.0
+				mmi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
+			else:
+				mmi.visibility_range_begin = 300.0
+				mmi.visibility_range_begin_margin = 40.0
+				mmi.visibility_range_end = 1600.0
+				mmi.visibility_range_fade_mode = GeometryInstance3D.VISIBILITY_RANGE_FADE_SELF
+				mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+				far_tree_nodes.append(mmi)
+			add_child(mmi)
+		# physics
+		for pl in arr:
+			_tree_physics(pl, near_v)
+		gi += 1
+		if gi % 12 == 0:
+			progress.call(0.64 + 0.16 * float(gi) / groups.size(), "Planting trees")
+			await get_tree().process_frame
+
+var _forest_bodies: Dictionary = {}
+
+func _tree_physics(pl: Array, v: Dictionary) -> void:
+	var p: Vector3 = pl[2]
+	var s := float(pl[4])
+	var b := Basis(Vector3.UP, float(pl[3])).scaled(Vector3.ONE * s)
+	var species := String(v["species"])
+	if not bool(pl[5]):
+		# Full canopy interaction without thousands of always-active Area3Ds.
+		# These are the SAME conservative soft volumes used by nearby trees.
+		for crown in v["canopy"]:
+			outer_canopies.add(p + b * (crown[0] as Vector3), float(crown[1]) * s * 0.85,
+				1.0 if species in ["bush", "hedge"] else (0.8 if species == "pine" else 0.6))
+		# Solid trunks are still grouped per 300 m chunk into one static body.
+		var key := "%d_%d" % [int(floor(p.x / 300.0)), int(floor(p.z / 300.0))]
+		if not _forest_bodies.has(key):
+			var fb := StaticBody3D.new()
+			fb.collision_layer = Game.L_WORLD
+			fb.set_meta("kind", "tree")
+			fb.set_meta("hardness", 1.3)
+			add_child(fb)
+			_forest_bodies[key] = fb
+		if species != "bush":
+			var cs := CollisionShape3D.new()
+			var cap := CylinderShape3D.new()
+			cap.radius = float(v["trunk_r"]) * s
+			cap.height = float(v["height"]) * s * 0.8
+			cs.shape = cap
+			cs.position = p + Vector3(0, cap.height * 0.5, 0)
+			(_forest_bodies[key] as StaticBody3D).add_child(cs)
+		return
+	if species != "bush" and species != "hedge":
+		var body := StaticBody3D.new()
+		body.collision_layer = Game.L_WORLD
+		body.set_meta("kind", "tree")
+		body.set_meta("hardness", 1.3)
+		body.position = p
+		add_child(body)
+		for l in v["limbs"]:
+			var a: Vector3 = b * (l[0] as Vector3)
+			var e: Vector3 = b * (l[1] as Vector3)
+			var r := float(l[2]) * s
+			if r < 0.06:
+				continue   # thin branches are handled by the soft canopy volume
+			var cs2 := CollisionShape3D.new()
+			var cap2 := CapsuleShape3D.new()
+			cap2.radius = r
+			cap2.height = maxf(a.distance_to(e) + r * 2.0, r * 2.01)
+			cs2.shape = cap2
+			var mid := (a + e) * 0.5
+			var up := (e - a).normalized()
+			var bas := Basis(up.cross(Vector3.FORWARD if absf(up.z) < 0.9 else Vector3.RIGHT).normalized(), up, Vector3.ZERO)
+			bas.z = bas.x.cross(bas.y)
+			cs2.transform = Transform3D(bas.orthonormalized(), mid)
+			body.add_child(cs2)
+	# soft foliage volumes
+	for c in v["canopy"]:
+		var ar := Area3D.new()
+		ar.collision_layer = Game.L_FOLIAGE
+		ar.collision_mask = 0
+		ar.monitoring = false
+		ar.monitorable = true
+		var cs3 := CollisionShape3D.new()
+		var sp := SphereShape3D.new()
+		sp.radius = float(c[1]) * s * 0.85
+		cs3.shape = sp
+		ar.add_child(cs3)
+		var cpos: Vector3 = p + b * (c[0] as Vector3)
+		ar.position = cpos
+		ar.set_meta("center", cpos)
+		ar.set_meta("radius", sp.radius)
+		ar.set_meta("density", 1.0 if species in ["bush", "hedge"] else (0.8 if species == "pine" else 0.6))
+		add_child(ar)
+
+func _bush(p: Vector3, species: String, idx: int) -> void:
+	var v := _variant(species, idx % 3, false)
+	p.y = ground_y(p)
+	var mi := MeshInstance3D.new()
+	mi.mesh = v["mesh"]
+	mi.position = p
+	mi.rotation.y = rng.randf() * TAU
+	add_child(mi)
+	_tree_physics([species, idx, p, mi.rotation.y, 1.0, true], v)
+
+# ================================================================ grass
+func _build_grass() -> void:
+	var mat := ShaderMaterial.new()
+	mat.shader = load("res://shaders/grass_blades.gdshader")
+	# clump mesh: 7 blades
+	var kit := MeshKit.new()
+	var r := RandomNumberGenerator.new()
+	r.seed = 3
+	for b in 7:
+		var a := r.randf() * TAU
+		var off := Vector3(r.randf_range(-0.07, 0.07), 0, r.randf_range(-0.07, 0.07))
+		var h := r.randf_range(0.09, 0.23)
+		var w := r.randf_range(0.003, 0.006)
+		var d := Vector3(cos(a), 0, sin(a))
+		var lean := Vector3(r.randf_range(-0.04, 0.04), 0, r.randf_range(-0.04, 0.04))
+		var p0 := off - d * w
+		var p1 := off + d * w
+		var p2 := off + lean + Vector3(0, h, 0)
+		var mid := off + lean * 0.3 + Vector3(0, h * 0.55, 0)
+		var m0 := mid - d * w * 0.65
+		var m1 := mid + d * w * 0.65
+		var normal := Vector3(-d.z, 0.3, d.x).normalized()
+		var color := Color(0.86 + r.randf() * 0.14, 1.0, 0.82 + r.randf() * 0.18)
+		kit.add_triangle(p0, p1, m1, color, false, normal)
+		kit.add_triangle(p0, m1, m0, color, false, normal)
+		kit.add_triangle(m0, m1, p2, color, false, normal)
+	var mesh := ArrayMesh.new()
+	kit.append_to(mesh, mat)
+	# placement regions: around the pilot line and runway edges (where the camera is close)
+	var regions := [[Vector3(-60, 0, 7), Vector3(60, 0, 16.6), 1.3], [Vector3(-75, 0, -12), Vector3(75, 0, -6.2), 0.9], [Vector3(-75, 0, 6.2), Vector3(75, 0, 7), 1.2],
+		[Vector3(-25, 0, -2), Vector3(25, 0, 30), 0.0]]
+	# Preallocate the supported maximum once. Presets change visible instance count,
+	# not placement order, allocations, collision geometry, or the world seed.
+	var density := 3.2
+	for reg in regions:
+		var a: Vector3 = reg[0]
+		var bb: Vector3 = reg[1]
+		var dens := float(reg[2]) * density
+		if dens <= 0.0:
+			continue
+		var area := (bb.x - a.x) * (bb.z - a.z)
+		var count := int(area * dens * 1.6)
+		# split into 40 m tiles so culling works
+		var tiles_x := int(ceil((bb.x - a.x) / 40.0))
+		for tx in tiles_x:
+			var x0 := a.x + tx * 40.0
+			var x1 := minf(x0 + 40.0, bb.x)
+			var tcount := int(count * (x1 - x0) / (bb.x - a.x))
+			var mm := MultiMesh.new()
+			mm.transform_format = MultiMesh.TRANSFORM_3D
+			mm.mesh = mesh
+			mm.instance_count = tcount
+			var cen := Vector3((x0 + x1) * 0.5, 0, (a.z + bb.z) * 0.5)
+			var placed := 0
+			for k in tcount:
+				var p := Vector3(r.randf_range(x0, x1), 0, r.randf_range(a.z, bb.z))
+				if surface_at(p) == Game.SURF_ASPHALT:
+					p.z += 0.9 * signf(p.z)
+				p.y = ground_y(p)
+				var s := r.randf_range(0.7, 1.4)
+				mm.set_instance_transform(k, Transform3D(Basis(Vector3.UP, r.randf() * TAU).scaled(Vector3(s, s * r.randf_range(0.8, 1.3), s)), p - cen))
+				placed += 1
+			var mmi := MultiMeshInstance3D.new()
+			mmi.multimesh = mm
+			mmi.position = cen
+			mmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			mmi.visibility_range_end = 90.0
+			add_child(mmi)
+			grass_nodes.append(mmi)
+
+# ================================================================ people
+func _build_npcs() -> void:
+	var pts := [Vector3(-34, 0, 27), Vector3(-26, 0, 34), Vector3(-12, 0, 27), Vector3(-4, 0, 33), Vector3(8, 0, 26),
+		Vector3(14, 0, 29), Vector3(-18, 0, 22.5), Vector3(4, 0, 22.5), Vector3(30, 0, 33), Vector3(-40, 0, 24)]
+	var starts := [Vector3(-30, 0, 29), Vector3(-10, 0, 26), Vector3(6, 0, 30), Vector3(-20, 0, 23), Vector3(12, 0, 24), Vector3(-6, 0, 16.0)]
+	for i in starts.size():
+		var n := NPC.new()
+		add_child(n)
+		n.setup(1000 + i, pts, starts[i])
+		npcs.append(n)
+	# one fellow pilot standing at the next station
+	(npcs[5] as NPC).waypoints = [Vector3(-8, 0, 15.6), Vector3(-6, 0, 16.0)]
+
+func reset_npcs() -> void:
+	var i := 0
+	for n in npcs:
+		if is_instance_valid(n) and (n as NPC).down:
+			(n as NPC).reset_to((n as NPC).target)
+		i += 1
+
+# ================================================================ gates (for courses)
+func _build_gates() -> void:
+	pass
+
+func make_gates(points: Array) -> Array:
+	for g in gates:
+		if is_instance_valid(g):
+			g.queue_free()
+	gates.clear()
+	var i := 0
+	for p in points:
+		var pos: Vector3 = p[0]
+		var yaw: float = p[1]
+		var radius := 3.2
+		var g := Node3D.new()
+		g.position = pos
+		g.rotation.y = yaw
+		add_child(g)
+		var kit := MeshKit.new()
+		var segs := 24
+		var prevp := Vector3(radius, 0, 0)
+		var col := MeshKit.const_color(Color(1.0, 0.45, 0.05).srgb_to_linear() if i > 0 else Color(0.1, 0.9, 0.3).srgb_to_linear())
+		var body := StaticBody3D.new()
+		body.collision_layer = Game.L_GATE
+		body.set_meta("kind", "gate")
+		body.set_meta("hardness", 0.8)
+		g.add_child(body)
+		for k in range(1, segs + 1):
+			var a := TAU * float(k) / segs
+			var np := Vector3(cos(a) * radius, sin(a) * radius, 0)
+			kit.add_cylinder(prevp, np, 0.12, 0.12, 6, col, false)
+			var cs := CollisionShape3D.new()
+			var cap := CapsuleShape3D.new()
+			cap.radius = 0.13
+			cap.height = prevp.distance_to(np) + 0.26
+			cs.shape = cap
+			var mid := (prevp + np) * 0.5
+			var up := (np - prevp).normalized()
+			cs.transform = Transform3D(Basis(Vector3(0, 0, 1).cross(up), up, Vector3(0, 0, 1)).orthonormalized(), mid)
+			body.add_child(cs)
+			prevp = np
+		var mesh := ArrayMesh.new()
+		var mat := StandardMaterial3D.new()
+		mat.vertex_color_use_as_albedo = true
+		mat.emission_enabled = true
+		mat.emission = Color(1.0, 0.5, 0.1) * 0.4
+		kit.append_to(mesh, mat)
+		var mi := MeshInstance3D.new()
+		mi.mesh = mesh
+		g.add_child(mi)
+		# trigger area inside the ring
+		var ar := Area3D.new()
+		ar.collision_layer = 0
+		ar.collision_mask = Game.L_AIRCRAFT
+		var cs2 := CollisionShape3D.new()
+		var cyl2 := CylinderShape3D.new()
+		cyl2.radius = radius - 0.2
+		cyl2.height = 1.2
+		cs2.shape = cyl2
+		cs2.rotation.x = PI * 0.5
+		ar.add_child(cs2)
+		g.add_child(ar)
+		g.set_meta("area", ar)
+		g.set_meta("index", i)
+		g.set_meta("mesh", mi)
+		gates.append(g)
+		i += 1
+	return gates
+
+# ================================================================ per-frame
+func _process(delta: float) -> void:
+	if Game.wind:
+		var w: Vector3 = Game.wind.sample(Vector3(-24, 6.3, -40))
+		var spd := w.length()
+		if windsock_pivot:
+			var target_yaw := atan2(w.x, w.z) if spd > 0.2 else windsock_pivot.rotation.y
+			windsock_pivot.rotation.y = lerp_angle(windsock_pivot.rotation.y, target_yaw, clampf(delta * 1.5, 0, 1))
+			# droop: calm = hangs down, ~7 m/s = fully horizontal
+			var lift := clampf(spd / 7.0, 0.0, 1.0)
+			var t := Time.get_ticks_msec() / 1000.0
+			for i in windsock_segs.size():
+				var seg: Node3D = windsock_segs[i]
+				var droop := (1.0 - lift) * (0.42 + i * 0.05)
+				var flap := sin(t * (6.0 + i * 1.3) + i) * 0.06 * (0.3 + lift)
+				seg.rotation = Vector3(droop + flap, flap * 0.7, 0)
+		cloud_off += Vector2(Game.wind.base_dir.x, Game.wind.base_dir.z) * (0.0006 + Game.wind.base_speed * 0.00012) * delta
+		_cloud_t += delta
+		if _cloud_t > 0.2:
+			_cloud_t = 0.0
+			sky_mat.set_shader_parameter("cloud_offset", cloud_off)
+
+var _cloud_t := 0.0

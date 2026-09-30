@@ -289,3 +289,4 @@ func _run_aircraft(id: String) -> void:
 			await get_tree().physics_frame
 		line += " | knife-edge 4s: dAlt=%.1fm" % (a.global_position.y - h0)
 		print(line)
+
