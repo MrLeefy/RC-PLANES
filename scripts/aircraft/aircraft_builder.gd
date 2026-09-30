@@ -888,6 +888,43 @@ func _build_wing(w: Dictionary, wi: int) -> void:
 			var stk := _kit(_comp_part(inner), "body")
 			stk.add_cylinder(fus_low, wa, 0.0045, 0.0045, 6, _pfn("strut"))
 			stk.add_cylinder(fus_low + Vector3(0, 0, 0.05), wb, 0.0045, 0.0045, 6, _pfn("strut"))
+		# biplane rigging: cabane struts to the fuselage, interplane struts and flying wires.
+		# Without these the upper wing simply floats above the fuselage.
+		if wi == 1 and d["wings"].size() >= 2 and float(d["wings"][0]["y"]) > float(w["y"]) + 0.05 and cidx.has("wing0_%s" % sname):
+			var uw: Dictionary = d["wings"][0]
+			var usf: Dictionary = comps[int(cidx["wing0_%s" % sname])]["sf"]
+			var uhalf := float(uw["span"]) * 0.5
+			var s_l := 0.56
+			var s_u := clampf(s_l * half / maxf(uhalf, 0.01), 0.05, 0.98)
+			var rig := _kit(_comp_part(inner), "body")
+			var wire_col := MeshKit.const_color(_lin(Color(0.12, 0.12, 0.13), 0.0))
+			var sp_col := _pfn("strut")
+			for u_pair in [[0.2, 0.22], [0.66, 0.68]]:
+				var lo_pt := _sp(sf, s_l, float(u_pair[0]), 1.0)
+				var up_pt := _sp(usf, s_u, float(u_pair[1]), -1.0)
+				# slightly streamlined (flat-ish) strut: a main tube plus a thin fairing tube
+				rig.add_cylinder(lo_pt, up_pt, 0.0048, 0.0048, 8, sp_col)
+				rig.add_cylinder(lo_pt + Vector3(0, 0, 0.003), up_pt + Vector3(0, 0, 0.003), 0.0032, 0.0032, 6, sp_col, true, true)
+			if lod_detail >= 2:
+				# flying wires: X-bracing in the bay between the two struts
+				var a0 := _sp(sf, s_l, 0.2, 1.0)
+				var a1 := _sp(sf, s_l, 0.66, 1.0)
+				var b0 := _sp(usf, s_u, 0.22, -1.0)
+				var b1 := _sp(usf, s_u, 0.68, -1.0)
+				rig.add_cylinder(a0, b1, 0.0011, 0.0011, 4, wire_col, true, true)
+				rig.add_cylinder(a1, b0, 0.0011, 0.0011, 4, wire_col, true, true)
+				# inboard landing/flying wire from the lower root to the upper strut foot
+				var root_lo := _sp(sf, 0.04, 0.3, 1.0)
+				rig.add_cylinder(root_lo, b0.lerp(b1, 0.5), 0.0011, 0.0011, 4, wire_col, true, true)
+			# cabane: two struts per side from the upper wing centre section down to the fuselage decking
+			var cab_kit := _kit(_comp_part(core), "body")
+			var cz0 := float(uw["z"]) + float(uw["root"]) * 0.22
+			var cz1 := float(uw["z"]) + float(uw["root"]) * 0.68
+			for cz in [cz0, cz1]:
+				var cfp := _fus_param(cz)
+				var foot := Vector3(side * cfp[0] * 0.55, cfp[2] + cfp[1] * 0.92, cz)
+				var head := Vector3(side * minf(uhalf * 0.1, 0.11), float(uw["y"]) - 0.012, cz)
+				cab_kit.add_cylinder(foot, head, 0.0046, 0.0046, 6, sp_col)
 		# aero panels: 4 per half wing
 		var pbreaks := [0.0, 0.3, split, 0.8, 1.0]
 		for k in range(pbreaks.size() - 1):
@@ -1204,7 +1241,7 @@ func _build_nose_engine_details(nc: int, e: Dictionary) -> void:
 	var pos: Vector3 = e["pos"]
 	var fp := _fus_param(pos.z + 0.03)
 	var k := _kit(_comp_part(nc), "metalbare")
-	var grey := MeshKit.const_color(_lin(Color(0.55, 0.56, 0.58), 0.0))
+	var grey := MeshKit.const_color(_lin(Color(0.26, 0.27, 0.29), 0.0))
 	var dark := _kit(_comp_part(nc), "cockpit")
 	if bool(e.get("radial", false)):
 		# dark cowl opening with radial cylinder heads
@@ -1993,9 +2030,9 @@ func _place_labels() -> void:
 func _label(text: String, size: float, colr: Color) -> Label3D:
 	var l := Label3D.new()
 	l.text = text
-	l.font_size = 64
+	l.font_size = 160
 	l.outline_size = 0
-	l.pixel_size = size / 64.0
+	l.pixel_size = size / 160.0
 	l.modulate = colr
 	l.shaded = true
 	l.double_sided = false

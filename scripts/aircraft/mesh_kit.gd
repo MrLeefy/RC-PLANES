@@ -126,7 +126,7 @@ func _emit_grid(list: PackedInt32Array, base: int, cc: int, rsel: Array, csel: A
 ## (a stripe or camo edge crosses the triangle) the triangle is split into a small
 ## barycentric lattice and re-painted, so the edge resolves crisply instead of smearing or
 ## stair-stepping. Sub-vertices lie exactly on the parent triangle, so no cracks appear.
-const REFINE_K := 6
+const REFINE_K := 4
 const REFINE_THRESHOLD := 0.06
 
 func _col_dist(a: Color, b: Color) -> float:

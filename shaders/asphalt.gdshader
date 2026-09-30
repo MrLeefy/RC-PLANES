@@ -45,7 +45,9 @@ void fragment() {
 	col = mix(col, vec3(0.28, 0.27, 0.22) * (0.8 + 0.4 * agg), edge * smoothstep(0.35, 0.75, n2(p * 1.3)));
 	// markings
 	// anti-aliased markings (box masks softened by screen-space derivatives)
-	vec2 fw = max(fwidth(p), vec2(0.002));
+	// Clamp the AA width: at grazing angles the screen-space derivative reaches metres and
+	// would smear paint into broad blobs (and block-step, since derivatives are per 2x2 quad).
+	vec2 fw = clamp(fwidth(p), vec2(0.002), vec2(0.3));
 	float fwx = fw.x;
 	float fwz = fw.y;
 	float paint = 0.0;

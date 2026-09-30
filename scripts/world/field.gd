@@ -475,8 +475,12 @@ func _commit_props() -> void:
 func label(text: String, pos: Vector3, yaw: float, size: float, color: Color, flat := false) -> Label3D:
 	var l := Label3D.new()
 	l.text = text
-	l.font_size = 96
-	l.pixel_size = size / 96.0
+	# Glyph resolution scales with the physical size so a 4.5 m runway numeral is not a
+	# stretched 96 px bitmap (blobby, stair-stepped edges).
+	var fpx := int(clampf(size * 110.0, 96.0, 480.0))
+	l.font_size = fpx
+	l.pixel_size = size / float(fpx)
+	l.outline_size = 0
 	l.modulate = color
 	l.shaded = true
 	l.alpha_cut = Label3D.ALPHA_CUT_DISCARD
