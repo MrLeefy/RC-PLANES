@@ -1,0 +1,12 @@
+{
+  "version": "0.10.0",
+  "package": "com.rcpark.sim.upgrade",
+  "delivery": "source implementation preview",
+  "source_changes_implemented": true,
+  "successful_import_verified": false,
+  "regression_pass_verified": false,
+  "rendered_visual_validation_verified": false,
+  "upgraded_apk_built_and_verified": false,
+  "physical_android_tested": false,
+  "professional_asset_replacement_completed": false
+}

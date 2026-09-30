@@ -1,0 +1,82 @@
+; RC Park - Godot 4.7 project
+config_version=5
+
+[application]
+
+config/name="RC Park Preview"
+config/description="Native 3D RC airplane simulator"
+config/version="0.10.0"
+run/main_scene="res://scenes/main.tscn"
+config/features=PackedStringArray("4.7", "Mobile")
+config/icon="res://icon.png"
+config/quit_on_go_back=false
+boot_splash/bg_color=Color(0.06, 0.07, 0.09, 1)
+boot_splash/show_image=false
+run/max_fps=0
+
+[autoload]
+
+Settings="*res://scripts/autoload/settings.gd"
+Game="*res://scripts/autoload/game.gd"
+Sfx="*res://scripts/autoload/sfx.gd"
+Diag="*res://scripts/autoload/diag.gd"
+
+[display]
+
+window/size/viewport_width=1600
+window/size/viewport_height=740
+window/stretch/mode="canvas_items"
+window/stretch/aspect="expand"
+window/handheld/orientation=4
+window/vsync/vsync_mode=1
+
+[input_devices]
+
+pointing/emulate_touch_from_mouse=true
+pointing/emulate_mouse_from_touch=true
+
+[physics]
+
+3d/physics_engine="Jolt Physics"
+common/physics_ticks_per_second=120
+common/max_physics_steps_per_frame=6
+3d/default_linear_damp=0.0
+3d/default_angular_damp=0.0
+3d/sleep_threshold_linear=0.08
+3d/sleep_threshold_angular=0.12
+
+[rendering]
+
+renderer/rendering_method="mobile"
+renderer/rendering_method.mobile="mobile"
+textures/vram_compression/import_etc2_astc=true
+lights_and_shadows/directional_shadow/size=2048
+lights_and_shadows/directional_shadow/soft_shadow_filter_quality=2
+lights_and_shadows/directional_shadow/16_bits=true
+anti_aliasing/quality/msaa_3d=1
+environment/defaults/default_clear_color=Color(0.55, 0.68, 0.82, 1)
+shading/overrides/force_vertex_shading=false
+textures/default_filters/anisotropic_filtering_level=2
+
+[shader_globals]
+
+wind_dir={
+"type": "vec2",
+"value": Vector2(1, 0)
+}
+wind_strength={
+"type": "float",
+"value": 0.3
+}
+wind_gust={
+"type": "float",
+"value": 0.0
+}
+cam_pos={
+"type": "vec3",
+"value": Vector3(0, 0, 0)
+}
+grass_fade={
+"type": "float",
+"value": 55.0
+}
