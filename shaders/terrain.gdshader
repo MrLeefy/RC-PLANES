@@ -69,6 +69,12 @@ void fragment() {
 	float wear = rmask(p, vec4(-22.0, 13.5, 22.0, 18.0), 2.5);
 	col = mix(col, mix(col, dirt, 0.45), wear * smoothstep(0.35, 0.7, mid));
 	col *= 0.97 + 0.06 * fine;
+	// lawn micro-structure: blade streaks + light/dark clumps, faded out when sub-pixel
+	float blade_fade = 1.0 - smoothstep(0.012, 0.09, footprint);
+	float bl = n2(p * vec2(46.0, 38.0)) * 0.55 + n2(p * vec2(120.0, 95.0)) * 0.45;
+	float clump = n2(p * 1.35 + 4.2) * 0.6 + n2(p * 4.7) * 0.4;
+	float lawn = 1.0 - gr - pathm;
+	col *= mix(1.0, (0.84 + 0.32 * bl) * (0.9 + 0.2 * clump), blade_fade * clamp(lawn, 0.0, 1.0) * (1.0 - farmzone));
 	ALBEDO = col;
 	ROUGHNESS = 0.96;
 	SPECULAR = 0.25;

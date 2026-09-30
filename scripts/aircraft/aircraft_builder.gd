@@ -354,10 +354,9 @@ func paint(zone: String, p: Vector3, n: Vector3) -> Color:
 			if zone == "fus" and rel_y > 0.4 and zf < 0.1: col = a2
 			if zone == "fin" and p.y > 0.4: col = base
 		"camo_grey":
-			var q := Vector2(p.x * 1.3 + p.z * 0.7, p.z * 1.1 - p.x * 0.6 + p.y * 2.0) * 7.0
-			var cell := int(floor(q.x)) * 7 + int(floor(q.y)) * 13
-			var t := cell % 3
-			col = base if t == 0 else (a1 if t == 1 else base.lerp(a1, 0.5))
+			# flowing two-tone splinter camo: smooth sine-sum blotches with crisp edges
+			var cm := sin(p.x * 7.0 + p.z * 5.0 + sin(p.z * 9.0) * 0.8) + sin(p.z * 6.5 - p.x * 4.0 + p.y * 8.0) + 0.6 * sin(p.x * 13.0 - p.z * 11.0)
+			col = a1 if cm > 0.55 else (base.lerp(a1, 0.5) if cm > 0.1 else base)
 			if zone == "fus" and zf < 0.06: col = a2
 		"hog":
 			var camo2 := sin(p.x * 6.0 + p.z * 3.0) + 0.7 * sin(p.z * 9.0 + p.y * 5.0)
@@ -403,6 +402,10 @@ func paint(zone: String, p: Vector3, n: Vector3) -> Color:
 			pass
 	if zone == "nacelle" and scheme in ["cargo", "grey2", "hog", "camo_grey"]:
 		col = base
+	# Real white paint reflects ~80-85 %; pure 1.0 albedo clips in direct sun and flattens all form.
+	var peak := maxf(col.r, maxf(col.g, col.b))
+	if peak > 0.86:
+		col = Color(col.r * 0.86 / peak, col.g * 0.86 / peak, col.b * 0.86 / peak, col.a)
 	return _lin(col, alpha)
 
 func _wing_chord_frac(p: Vector3) -> float:
@@ -1249,8 +1252,22 @@ func _build_nacelle(nc: int, e: Dictionary, nac: Dictionary, is_prop: bool) -> v
 	var kit := _kit(_comp_part(nc), "body")
 	var start := kit.verts.size()
 	if bool(nac.get("box", false)):
-		var xf := Transform3D(Basis().scaled(Vector3(r * 2.1, r * 1.9, L)), pos + Vector3(0, 0, L * 0.5 - 0.02))
-		kit.add_box(xf, paint("nacelle", pos, Vector3.UP))
+		# rounded-rectangle (superellipse) loft with a gentle exhaust taper instead of a raw box
+		var rows := []
+		var nst := 14 if lod_detail >= 1 else 5
+		for si in nst + 1:
+			var tt := float(si) / nst
+			var zz := pos.z - 0.02 + (L + 0.02) * tt
+			var taper := 1.0 - 0.14 * tt * tt
+			var swell := 1.0 + 0.04 * sin(tt * PI)
+			var ring := PackedVector3Array()
+			for k in 24:
+				var a := TAU * float(k) / 24.0 - PI * 0.5
+				var ca := cos(a)
+				var sa := sin(a)
+				ring.append(Vector3(signf(ca) * pow(absf(ca), 0.5) * r * 1.05 * taper * swell, signf(sa) * pow(absf(sa), 0.5) * r * 0.95 * taper * swell, zz) + Vector3(pos.x, pos.y, 0.0))
+			rows.append(ring)
+		_grid_auto(kit, rows, true, _pfn("nacelle"))
 		var dk := _kit(_comp_part(nc), "cockpit")
 		dk.add_box(Transform3D(Basis().scaled(Vector3(r * 1.8, r * 1.6, 0.004)), pos + Vector3(0, 0, -0.022)), Color(0.02, 0.02, 0.02))
 		dk.add_box(Transform3D(Basis().scaled(Vector3(r * 1.7, r * 1.5, 0.004)), pos + Vector3(0, 0, L - 0.018)), Color(0.02, 0.02, 0.02))
@@ -1259,7 +1276,9 @@ func _build_nacelle(nc: int, e: Dictionary, nac: Dictionary, is_prop: bool) -> v
 		if is_prop:
 			prof = [Vector2(0.0, r * 0.62), Vector2(L * 0.05, r * 0.9), Vector2(L * 0.2, r), Vector2(L * 0.6, r * 0.92), Vector2(L * 0.9, r * 0.55), Vector2(L, r * 0.2)]
 		else:
-			prof = [Vector2(0.0, r * 0.9), Vector2(L * 0.08, r), Vector2(L * 0.5, r * 0.98), Vector2(L * 0.85, r * 0.8), Vector2(L, r * 0.62)]
+			# rounded inlet lip, full barrel, tapered exhaust cone (instead of a flat-cut tube)
+			prof = [Vector2(0.0, r * 0.80), Vector2(L * 0.012, r * 0.93), Vector2(L * 0.04, r * 1.02), Vector2(L * 0.12, r * 1.06),
+				Vector2(L * 0.45, r * 1.04), Vector2(L * 0.78, r * 0.9), Vector2(L * 0.93, r * 0.74), Vector2(L, r * 0.64)]
 		kit.add_lathe(prof, pos, Basis(), 18 if lod_detail >= 1 else 8, _pfn("nacelle"))
 		if not is_prop:
 			# intake face + exhaust
@@ -1278,7 +1297,22 @@ func _build_nacelle(nc: int, e: Dictionary, nac: Dictionary, is_prop: bool) -> v
 		var wing_y := float(d["wings"][0]["y"]) + absf(pos.x) * tan(deg_to_rad(float(d["wings"][0]["dihedral"])))
 		var top := pos + Vector3(0, r * 0.8, L * 0.35)
 		var h := wing_y - top.y
-		kit.add_box(Transform3D(Basis().scaled(Vector3(0.008, maxf(h + 0.01, 0.01), L * 0.6)), top + Vector3(0, h * 0.5, 0.0)), paint("nacelle", top, Vector3.UP))
+		# swept, lens-section pylon lofted from the nacelle up into the wing
+		var prows := []
+		var chord_lo := L * 0.55
+		var chord_hi := L * 0.9
+		for pi in 6:
+			var tt := float(pi) / 5.0
+			var yy := lerpf(top.y - r * 0.4, top.y + h + 0.004, tt)
+			var cc := lerpf(chord_lo, chord_hi, tt)
+			var zle := pos.z + L * 0.12 - 0.06 * tt
+			var th := lerpf(0.011, 0.008, tt)
+			var pring := PackedVector3Array()
+			for k in 12:
+				var a := TAU * float(k) / 12.0
+				pring.append(Vector3(pos.x + th * sin(a) * 0.5, yy, zle + cc * (0.5 - 0.5 * cos(a))))
+			prows.append(pring)
+		_grid_auto(kit, prows, true, _pfn("nacelle"))
 	_grow_kit(nc, kit, start)
 
 func _build_fan(ec: int, e: Dictionary, eng: Dictionary, ei: int) -> void:
@@ -1511,7 +1545,7 @@ func _build_wheel(wd: Dictionary, gi: int) -> void:
 			hk.add_cylinder(cc + Vector3(-w * 0.45, 0, 0), cc + Vector3(w * 0.45, 0, 0), r * 0.12, r * 0.12, 6, MeshKit.const_color(_lin(Color(0.3, 0.3, 0.3))), true, true)
 	if bool(wd["pants"]):
 		var pk := _kit(slider, "body")
-		pk.add_ellipsoid(c + Vector3(0, r * 0.25, r * 0.25), Vector3(w * 0.95, r * 0.95, r * 2.1), 14, 8, _pfn("pant"))
+		pk.add_ellipsoid(c + Vector3(0, r * 0.2, r * 0.3), Vector3(w * 0.78, r * 0.84, r * 1.75), 18, 10, _pfn("pant"))
 	var retract_axis := Vector3(0, 0, 1) * (-signf(c.x) if absf(c.x) > 0.001 else 1.0)
 	var retract_angle := deg_to_rad(88.0)
 	if absf(c.x) < 0.001:
@@ -1926,15 +1960,34 @@ func _place_labels() -> void:
 			var fp := _fus_param(z)
 			var host := int(cidx["fuselage"]) if z < z_split else int(cidx["tail_boom"])
 			var y := float(fp[2]) + float(lab.get("y", 0.0))
-			# surface x at this height
-			var rel := clampf((y - float(fp[2])) / float(fp[1]), -0.95, 0.95)
-			var ex := 2.0 / float(fp[3])
-			var t := asin(rel)
-			var xs := pow(absf(cos(t)), ex) * float(fp[0]) + 0.0015
+			# The decal is a flat card. Sample the fuselage skin over the whole text length, push the
+			# card out to the widest point (so no letter is buried by a swelling fuselage) and yaw it
+			# to follow the skin slope, instead of clipping the ends of the word.
+			var ext := float(text.length()) * size * 0.6
+			var zs0 := z - ext * 0.5
+			var zs1 := z + ext * 0.5
+			var xmax := 0.0
+			var xa := 0.0
+			var xb := 0.0
+			for si in 9:
+				var zz := lerpf(zs0, zs1, float(si) / 8.0)
+				var fq := _fus_param(zz)
+				var xq := 0.0
+				# the card is also ~text-height tall: the skin falls away toward the crown, so take the widest point
+				for dy in [0.0, -0.5, 0.5]:
+					var relq := clampf((y + dy * size - float(fq[2])) / float(fq[1]), -0.95, 0.95)
+					xq = maxf(xq, pow(absf(cos(asin(relq))), 2.0 / float(fq[3])) * float(fq[0]))
+				xmax = maxf(xmax, xq)
+				if si == 0: xa = xq
+				if si == 8: xb = xq
+			var slope := (xb - xa) / maxf(ext, 0.001)
+			# keep the card outside the skin everywhere along its length (mm-scale stand-off)
+			var xs := xmax + 0.0015
 			for side in [-1, 1]:
 				var l2 := _label(text, size, colr)
 				l2.position = Vector3(side * xs, y, z)
-				l2.basis = Basis(Vector3.UP, PI * 0.5 * side)
+				var nrm2 := Vector2(float(side), -slope)
+				l2.basis = Basis(Vector3.UP, atan2(nrm2.x, nrm2.y))
 				(comps[host]["visual"] as Node3D).add_child(l2)
 
 func _label(text: String, size: float, colr: Color) -> Label3D:
