@@ -64,7 +64,7 @@ static func _elec(pos: Vector3, kv: float, rm: float, i0: float, mass: float, o:
 static func _ic(kind: String, pos: Vector3, qmax: float, rpm_peak: float, rpm_max: float, mass: float, o: Dictionary = {}) -> Dictionary:
 	# kind: glow2, glow4, gas2
 	var e := {"type": kind, "pos": pos, "dir": Vector3(0, 0, -1), "qmax": qmax, "rpm_peak": rpm_peak,
-		"rpm_max": rpm_max, "mass": mass, "spin": 1, "idle": 0.2, "nacelle": {}, "spinner_r": 0.035,
+		"rpm_max": rpm_max, "mass": mass, "spin": 1, "idle": 0.1, "nacelle": {}, "spinner_r": 0.035,
 		"spinner_len": 0.07, "bsfc": 1.0}
 	e.merge(o, true)
 	return e
@@ -97,7 +97,7 @@ static func _base(o: Dictionary) -> Dictionary:
 		"cg": 0.28, "rates": {"ail": 22.0, "elev": 20.0, "rud": 25.0, "flap": 35.0},
 		"servo_speed": 420.0, "strength": 1.0, "livery": {}, "labels": [],
 		"batteries": [], "props": [], "tank": 0.0, "fuel_type": "", "gear_drag": 0.012,
-		"body_cd": 0.12, "sound": "", "wheelbase_brake": 3.0, "details": {},
+		"body_cd": 0.12, "sound": "", "wheelbase_brake": 3.0, "details": {}, "trim_cl": 0.36,
 	}
 	d.merge(o, true)
 	return d
@@ -150,12 +150,12 @@ static func _build() -> Array:
 			_wheel(-0.13, -0.10, 0.17, 0.065, {"len": 0.08, "style": "bush", "w": 0.05}),
 			_wheel(0.13, -0.10, 0.17, 0.065, {"len": 0.08, "style": "bush", "w": 0.05}),
 			_wheel(0, 0.005, 0.87, 0.018, {"len": 0.04, "steer": true, "style": "tail", "tail": true, "brake": false})]},
-		"cg": 0.32, "rates": {"ail": 22.0, "elev": 22.0, "rud": 30.0, "flap": 40.0},
+		"cg": 0.34, "rates": {"ail": 22.0, "elev": 22.0, "rud": 30.0, "flap": 40.0},
 		"livery": {"scheme": "cub", "base": Color(0.98, 0.80, 0.08), "a1": Color(0.06, 0.06, 0.07), "a2": Color(0.85, 0.85, 0.85)},
 		"labels": [{"text": "TUNDRA CUB", "z": 0.45, "y": 0.005, "size": 0.03, "color": Color(0.05, 0.05, 0.05)}],
 		"batteries": [_batt("3S 2200 mAh", 3, 2.2, 0.19), _batt("4S 2200 mAh", 4, 2.2, 0.25)],
 		"props": [_prop("11 x 5.5", 11, 5.5), _prop("10 x 6", 10, 6)],
-		"body_cd": 0.28, "gear_drag": 0.03,
+		"body_cd": 0.28, "gear_drag": 0.03, "trim_cl": 0.6,
 	}))
 
 	# 3 ── STOL: Ridgeline STOL (foam, slats + big flaps)
@@ -182,7 +182,7 @@ static func _build() -> Array:
 		"labels": [{"text": "RIDGELINE", "z": 0.52, "y": 0.01, "size": 0.034, "color": Color(0.2, 0.2, 0.22)}],
 		"batteries": [_batt("4S 3000 mAh", 4, 3.0, 0.33), _batt("4S 3300 mAh", 4, 3.3, 0.36)],
 		"props": [_prop("12 x 6", 12, 6, 3), _prop("11 x 7", 11, 7, 3)],
-		"body_cd": 0.25, "gear_drag": 0.03,
+		"body_cd": 0.25, "gear_drag": 0.03, "trim_cl": 0.6,
 	}))
 
 	# 4 ── 3D aerobat: Vortex 540 (balsa/composite, 35cc gas)
@@ -517,7 +517,7 @@ static func _build() -> Array:
 			[2.05, 0.012, 0.03, 0.02, 2.0]],
 		"canopy": {"z0": 0.26, "z1": 0.34, "hw": 0.045, "hh": 0.02, "y": 0.052, "style": "cockpit", "tint": Color(0.05, 0.06, 0.08)},
 		"wings": [_wing(0.78, -0.05, 0.92, 1.05, 0.06, {"dihedral": 0.0, "incidence": 1.0, "washout": 0.0, "thick": 0.035,
-			"camber": 0.0, "ail": [0.12, 0.92, 0.12], "flap": [], "sweep": 58.0, "tip_style": "square", "elevon": true, "stall_deg": 32.0, "x0": 0.06})],
+			"camber": 0.0, "ail": [0.12, 0.92, 0.2], "flap": [], "sweep": 58.0, "tip_style": "square", "elevon": true, "stall_deg": 32.0, "x0": 0.06})],
 		"htail": {},
 		"vtails": [_vtail(1.45, 0.07, 0.34, 0.52, 0.14, {"sweep": 55.0, "rudder_cf": 0.3})],
 		"engines": [

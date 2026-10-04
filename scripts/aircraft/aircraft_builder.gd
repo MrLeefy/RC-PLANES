@@ -1524,7 +1524,8 @@ func _build_wheel(wd: Dictionary, gi: int) -> void:
 				if String(e["type"]) in ["electric", "glow2", "glow4", "gas2"]:
 					var pr := _prop_choice(e)
 					var tip_y: float = float((e["pos"] as Vector3).y) - float(pr["d"]) * 0.5
-					need = minf(need, tip_y - travel0 * 1.2 - 0.03)
+					# taildraggers flare and touch down on the mains in a shallow attitude, so give them more prop margin
+					need = minf(need, tip_y - travel0 * 1.2 - (0.05 if not tricycle else 0.03))
 		if c.y - r > need:
 			var dy := (c.y - r) - need
 			c.y -= dy

@@ -435,6 +435,13 @@ func _col_box(cat: String, xf: Transform3D, size: Vector3) -> void:
 	cs.transform = xf
 	_body(cat).add_child(cs)
 
+func _col_hull(cat: String, pts: PackedVector3Array) -> void:
+	var cs := CollisionShape3D.new()
+	var h := ConvexPolygonShape3D.new()
+	h.points = pts
+	cs.shape = h
+	_body(cat).add_child(cs)
+
 func _col_cyl(cat: String, pos: Vector3, r: float, h: float) -> void:
 	var cs := CollisionShape3D.new()
 	var c := CylinderShape3D.new()
@@ -495,13 +502,22 @@ func label(text: String, pos: Vector3, yaw: float, size: float, color: Color, fl
 func _build_runway() -> void:
 	var kit := MeshKit.new()
 	var rows := []
+	# The slab is 3 cm proud of the grass. A vertical lip that tall stops a small nose wheel dead (a 2.6 cm
+	# wheel cannot climb it), so the slab edge is bevelled over 60 cm in both the mesh and the collider.
+	var bev := 0.6
+	var zs := [-RWY_HALF_W - bev]
 	for j in 13:
-		var z := -RWY_HALF_W + j * (2.0 * RWY_HALF_W / 12.0)
+		zs.append(-RWY_HALF_W + j * (2.0 * RWY_HALF_W / 12.0))
+	zs.append(RWY_HALF_W + bev)
+	var xs := [-RWY_HALF_LEN - bev]
+	for i in 71:
+		xs.append(-RWY_HALF_LEN + i * (2.0 * RWY_HALF_LEN / 70.0))
+	xs.append(RWY_HALF_LEN + bev)
+	for z in zs:
 		var row := PackedVector3Array()
-		for i in 71:
-			var x := -RWY_HALF_LEN + i * (2.0 * RWY_HALF_LEN / 70.0)
-			var crown := 0.03 + 0.03 * (1.0 - pow(absf(z) / RWY_HALF_W, 2.0))
-			row.append(Vector3(x, crown, z))
+		for x in xs:
+			var outside := absf(x) > RWY_HALF_LEN + 1e-3 or absf(z) > RWY_HALF_W + 1e-3
+			row.append(Vector3(x, 0.0 if outside else 0.03, z))
 		rows.append(row)
 	kit.add_grid(rows, false, MeshKit.const_color(Color.WHITE), false, true)
 	var mat := ShaderMaterial.new()
@@ -517,7 +533,13 @@ func _build_runway() -> void:
 	mi.mesh = mesh
 	mi.name = "Runway"
 	add_child(mi)
-	_col_box("runway", Transform3D(Basis(), Vector3(0, -0.07, 0)), Vector3(RWY_HALF_LEN * 2.0, 0.2, RWY_HALF_W * 2.0))
+	var hull := PackedVector3Array()
+	for sx in [-1.0, 1.0]:
+		for sz in [-1.0, 1.0]:
+			hull.append(Vector3(sx * RWY_HALF_LEN, 0.03, sz * RWY_HALF_W))
+			hull.append(Vector3(sx * (RWY_HALF_LEN + bev), 0.0, sz * (RWY_HALF_W + bev)))
+			hull.append(Vector3(sx * (RWY_HALF_LEN + bev), -0.17, sz * (RWY_HALF_W + bev)))
+	_col_hull("runway", hull)
 	# runway numbers
 	label("09", Vector3(-RWY_HALF_LEN + 10.0, 0.065, 0), -PI * 0.5, 4.5, Color(0.85, 0.85, 0.82), true)
 	label("27", Vector3(RWY_HALF_LEN - 10.0, 0.065, 0), PI * 0.5, 4.5, Color(0.85, 0.85, 0.82), true)

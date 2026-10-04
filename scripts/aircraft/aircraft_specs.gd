@@ -148,6 +148,7 @@ static func _thrust_at(ac: Aircraft, v: float, thr: float) -> Dictionary:
 	var shaft := 0.0
 	var burn := 0.0
 	var torque := 0.0
+	var per := []
 	var etype := String(ac.def["engines"][0]["type"])
 	var dt := 0.005
 	var steps := 600 if etype in ["electric", "edf"] else (1400 if etype == "turbine" else 700)
@@ -165,8 +166,10 @@ static func _thrust_at(ac: Aircraft, v: float, thr: float) -> Dictionary:
 		shaft = 0.0
 		burn = 0.0
 		torque = 0.0
+		per.clear()
 		for e: Propulsion in engs:
 			e.step(dt, thr, v, bat, true)
+			per.append(e.thrust)
 			thrust += e.thrust
 			total_i += e.current
 			rpm = maxf(rpm, e.rpm())
@@ -174,7 +177,7 @@ static func _thrust_at(ac: Aircraft, v: float, thr: float) -> Dictionary:
 			burn += e.fuel_burn_rate()
 			torque += e.torque
 		power_in = total_i * (bat["v"] as float)
-	return {"thrust": thrust, "current": total_i, "rpm": rpm, "power_in": power_in, "shaft": shaft, "burn": burn, "torque": torque}
+	return {"thrust": thrust, "current": total_i, "rpm": rpm, "power_in": power_in, "shaft": shaft, "burn": burn, "torque": torque, "per": per.duplicate()}
 
 static func _propulsion(ac: Aircraft, sp: Dictionary) -> void:
 	var d := ac.def
@@ -255,6 +258,19 @@ static func _solve_speed(ac: Aircraft, sp: Dictionary, thr: float) -> Dictionary
 	var v2 := (lo + hi) * 0.5
 	t = _thrust_at(ac, v2, thr)
 	return {"v": v2, "thrust": t["thrust"], "current": t["current"], "burn": t["burn"]}
+
+## Throttle (0..1) that holds level flight at airspeed v (bisection on thrust vs. drag).
+static func level_throttle(ac: Aircraft, v: float) -> float:
+	var drag: float = ac.level_flight(v)["drag"]
+	var lo := 0.0
+	var hi := 1.0
+	for it in 9:
+		var mid := (lo + hi) * 0.5
+		if float(_thrust_at(ac, v, mid)["thrust"]) > drag:
+			hi = mid
+		else:
+			lo = mid
+	return (lo + hi) * 0.5
 
 ## One-line human readable summary.
 static func summary(sp: Dictionary) -> String:

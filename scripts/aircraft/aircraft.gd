@@ -152,6 +152,10 @@ func setup(definition: Dictionary, config: Dictionary, detail_level := 2, for_di
 	for s in surfaces:
 		s["health"] = 1.0
 		s["dead"] = false
+		s["is_flap"] = false
+		for mx in s["mix"]:
+			if int(mx[0]) == 3:
+				s["is_flap"] = true
 	for w in wheels:
 		w["comp_now"] = 0.0
 		w["prev_comp"] = 0.0
@@ -706,6 +710,7 @@ func _aero(v_l: Vector3, w_l: Vector3, wind_l: Vector3, wind_tip_l: Vector3, ge_
 		if role == "htail":
 			alpha -= downwash
 		var dal := 0.0
+		var dal_f := 0.0
 		var cdc := 0.0
 		var cmc := 0.0
 		var area_f := float(p["eff"])
@@ -718,6 +723,8 @@ func _aero(v_l: Vector3, w_l: Vector3, wind_l: Vector3, wind_tip_l: Vector3, ge_
 			var ad := absf(dl)
 			var dd := float(c["tau"]) * float(c["frac"]) * float(s["health"]) * dl * (1.0 - 0.28 * minf(ad / 0.6, 1.0))
 			dal += dd
+			if s["is_flap"]:
+				dal_f += dd
 			cdc += 1.1 * float(c["frac"]) * float(c["cf"]) * sin(ad) * sin(ad)
 			cmc -= (0.15 + 0.35 * float(c["cf"])) * dd * float(p["cla"]) * (1.0 - float(c["cf"]))
 		area_f = maxf(area_f, 0.0)
@@ -732,8 +739,11 @@ func _aero(v_l: Vector3, w_l: Vector3, wind_l: Vector3, wind_tip_l: Vector3, ge_
 		var re_f := clampf(pow(3.0e5 / maxf(re, 2.0e4), 0.2), 0.82, 1.45)
 		var st := float(p["stall"]) - deg_to_rad(2.2) * clampf(log(3.0e5 / maxf(re, 2.0e4)) / 1.0986, -0.6, 1.0)
 		var a_eff := alpha - a0 + dal
-		var ap := st - a0
-		var an := st + a0
+		# Flaps shift the lift curve up AND raise CL max: the stall angle only falls by ~40 % of the shift
+		# (a plain 40 degree flap adds ~0.8-1.0 CL max). Without this a flapped wing stalls EARLIER at the
+		# same CL max, i.e. flaps would raise the stall speed.
+		var ap := st - a0 + 0.9 * maxf(dal_f, 0.0)
+		var an := st + a0 + 0.9 * maxf(-dal_f, 0.0)
 		var M := 28.0
 		var e1 := exp(clampf(-M * (a_eff - ap), -40.0, 40.0))
 		var e2x := exp(clampf(M * (a_eff + an), -40.0, 40.0))
@@ -769,6 +779,12 @@ func _aero(v_l: Vector3, w_l: Vector3, wind_l: Vector3, wind_tip_l: Vector3, ge_
 		T += r_app.cross(fp)
 		# section pitching moment (camber + control-surface deflection), fades after stall
 		var cm := (float(p.get("cm0", 0.0)) + cmc) * (1.0 - sigma)
+		# chordwise "camber" damping: a section pitching at rate w sees an alpha that varies along its chord,
+		# giving a restoring moment cm_q * (w c / 2V) about its own span axis (thin-airfoil cm_q ~ -pi/2,
+		# reduced here for viscous effects). Negligible on a tailed airplane, it is what damps the short
+		# period of a long-chord delta or flying wing.
+		var wq := w_l.dot(sd)
+		cm -= 0.9 * wq * float(p["chord"]) / (2.0 * V2) * (1.0 - sigma)
 		if cm != 0.0:
 			T += sd * (cm * q * area * float(p["chord"]))
 		if update_state:
@@ -786,9 +802,13 @@ func _aero(v_l: Vector3, w_l: Vector3, wind_l: Vector3, wind_tip_l: Vector3, ge_
 var pitch_trim := 0.0
 var has_htail := true
 
+## Airspeed the factory elevator trim is set for (a pre-trimmed ARF is trimmed for its normal cruise).
+func trim_speed() -> float:
+	return sqrt(2.0 * mass * G / (RHO * ref_area * float(def.get("trim_cl", 0.36))))
+
 func compute_factory_trim() -> void:
-	var cl_target := 0.36
-	var v_t := sqrt(2.0 * mass * G / (RHO * ref_area * cl_target))
+	var cl_target := float(def.get("trim_cl", 0.36))
+	var v_t := trim_speed()
 	var saved_cl := wing_cl
 	var best := 0.0
 	var lo := -0.6
@@ -802,8 +822,32 @@ func compute_factory_trim() -> void:
 			lo = mid
 		best = mid
 	pitch_trim = clampf(best, -0.65, 0.65)
-	# roll trim against prop torque at cruise (what a pilot trims out on the first flight)
+	# Trim for level-flight power, like a pilot does on the first flight: find the throttle that holds
+	# v_t, add the pitching moment of the thrust lines (an engine below/above the CG pitches the nose
+	# up/down with power) and re-solve the elevator. Then roll trim against the prop torque.
 	var tq := 0.0
+	var any_prop := false
+	for en in engines:
+		any_prop = any_prop or (en as Propulsion).is_prop()
+	var thr_lvl := clampf(AircraftSpecs.level_throttle(self, v_t), 0.08, 1.0)
+	var th: Dictionary = AircraftSpecs._thrust_at(self, v_t, thr_lvl)
+	var mt := 0.0
+	for ei in engines.size():
+		if ei < (th["per"] as Array).size() and not (comps[int(eng_defs[ei]["comp"])]["detached"]):
+			var r_e: Vector3 = (engines[ei] as Propulsion).pos - com_local
+			var f_e: Vector3 = (engines[ei] as Propulsion).dir * float(th["per"][ei])
+			mt += r_e.cross(f_e).x
+	_trim_extra_moment = mt
+	lo = -0.6
+	hi = 0.6
+	for it in 22:
+		var mid2 := (lo + hi) * 0.5
+		if _trim_moment(mid2, v_t) > 0.0:
+			hi = mid2
+		else:
+			lo = mid2
+		best = mid2
+	pitch_trim = clampf(best, -0.65, 0.65)
 	for ei in engines.size():
 		var e: Propulsion = engines[ei]
 		if not e.is_prop():
@@ -811,13 +855,15 @@ func compute_factory_trim() -> void:
 		var pr := Propulsion.new()
 		pr.setup(eng_defs[ei])
 		pr.running = true
+		if pr.type in ["glow2", "glow4", "gas2"]:
+			pr.omega = float(pr.d["rpm_peak"]) * 0.3 * TAU / 60.0   # already running, as in flight
 		var bat := {"v": 3.85 * bat_cells, "v_nom": 3.8 * bat_cells, "lvc": 1.0}
 		for k in 600:
-			pr.step(0.01, 0.5, v_t * 1.25, bat, true)
+			pr.step(0.01, thr_lvl, v_t, bat, true)
 		tq += pr.spin * pr.torque
 	if absf(tq) > 1e-4:
 		var a_t := _trim_alpha
-		var v_l := Vector3(0, -sin(a_t * 0.6), -cos(a_t * 0.6)) * v_t * 1.25
+		var v_l := Vector3(0, -sin(a_t * 0.6), -cos(a_t * 0.6)) * v_t
 		_set_elev(pitch_trim)
 		var m0 := (_aero(v_l, Vector3.ZERO, Vector3.ZERO, Vector3.ZERO, 1.0, false)[1] as Vector3).z
 		for s in surfaces:
@@ -834,6 +880,7 @@ func compute_factory_trim() -> void:
 
 var roll_trim := 0.0
 var _trim_alpha := 0.0
+var _trim_extra_moment := 0.0   # thrust-line pitching moment at level-flight power, included in the trim solve
 
 func _set_elev(elev: float) -> void:
 	for s in surfaces:
@@ -865,7 +912,7 @@ func _trim_moment(elev: float, v: float) -> float:
 		_trim_alpha = a
 	for s in surfaces:
 		s["defl"] = 0.0
-	return Tm
+	return Tm + _trim_extra_moment
 
 # ================================================================ control mixing
 func _mix_controls(dt: float, B: Basis, w_l: Vector3, air_l: Vector3) -> void:
@@ -1054,9 +1101,20 @@ func _gear_peak_eval(w: Dictionary, at: Vector3) -> void:
 	w["peak_done"] = true
 	var ratio := float(w["peak"]) / maxf(float(w["load"]), 0.01)
 	w["last_peak_g"] = maxf(float(w.get("last_peak_g", 0.0)), ratio)
-	if damage_mode == "off" or ratio <= 14.0:
+	# Load (in multiples of the static wheel load) the leg tolerates before it bends. Oleos and fat bush
+	# tyres take far more than a wire/spring leg; the airframe's strength rating scales it a little.
+	var lim := 14.0
+	match String(w["style"]):
+		"oleo", "bogie", "pod": lim = 26.0
+		"bush": lim = 30.0
+		"strut": lim = 22.0
+		"spring": lim = 20.0
+		"wire": lim = 16.0
+		"tail": lim = 18.0
+	lim *= clampf(float(def["strength"]), 0.8, 1.6) ** 0.5
+	if damage_mode == "off" or ratio <= lim:
 		return
-	var sev := (ratio - 14.0) / 14.0
+	var sev := (ratio - lim) / lim
 	if damage_mode == "physical":
 		w["bent"] = clampf(float(w["bent"]) + sev * 0.35, 0.0, 1.0)
 		w["hp"] = float(w["hp"]) - sev * 0.45

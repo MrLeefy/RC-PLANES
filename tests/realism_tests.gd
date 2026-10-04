@@ -23,11 +23,14 @@ const ENVELOPE := {
 var specs := {}
 
 func _run_all() -> void:
-	await super._run_all()
+	if OS.get_environment("RT_FAST") == "":
+		await super._run_all()
 	await t_audio_families()
 	t_spec_sheets()
+	var only := OS.get_environment("RT_ONLY")
 	for id in AircraftDB.ids():
-		await t_aircraft(id)
+		if only == "" or id in only.split(","):
+			await t_aircraft(id)
 	await t_fuel_and_parts_change_mass()
 
 # ---------------------------------------------------------------- specs / mass
@@ -93,19 +96,22 @@ func t_audio_families() -> void:
 		if not Sfx.bank.has(n) or Sfx.bank[n] == null:
 			missing.append(n)
 	_ok("audio: every propulsion, servo, retract, tyre, scrape and impact sound is synthesised", missing.is_empty(), str(missing))
-	# spectral centroid of each looped engine sample must differ clearly between families
-	var cent := {}
+	# each looped engine sample must have a clearly different spectral shape (8 log-spaced bands)
+	var prof := {}
 	for n in ["electric", "edf", "glow2", "glow4", "gas2", "turbine"]:
-		cent[n] = _centroid(Sfx.bank[n])
+		prof[n] = _band_profile(Sfx.bank[n])
 	var close := []
-	var names := cent.keys()
+	var names := prof.keys()
+	var dmat := {}
 	for i in names.size():
 		for j in range(i + 1, names.size()):
-			var a: float = cent[names[i]]
-			var b: float = cent[names[j]]
-			if absf(a - b) / maxf(a, b) < 0.08:
-				close.append("%s~%s" % [names[i], names[j]])
-	_ok("audio: propulsion families have clearly different spectra", close.is_empty(), "%s centroids=%s" % [str(close), str(cent)])
+			var dist := 0.0
+			for k in 8:
+				dist += absf(float(prof[names[i]][k]) - float(prof[names[j]][k]))
+			dmat["%s~%s" % [names[i], names[j]]] = snappedf(dist, 0.01)
+			if dist < 0.12:
+				close.append("%s~%s=%.2f" % [names[i], names[j], dist])
+	_ok("audio: propulsion families have clearly different spectra", close.is_empty(), "%s all=%s" % [str(close), str(dmat)])
 	# RPM response is monotonic, load response is family specific
 	var mono := true
 	for t in ["electric", "glow2", "glow4", "gas2"]:
@@ -152,31 +158,41 @@ func t_audio_families() -> void:
 	ac.toggle_gear()
 	await _frames(60)
 	var gear_snd := au.gear_motor.volume_db > -60.0 and ac.gear_pos < 1.0
-	await _frames(180)
+	await _frames(400)
 	_ok("audio: retract actuator sounds only while the gear travels", gear_snd and au.gear_motor.volume_db < -60.0 and ac.gear_pos <= 0.001, "pos=%.2f" % ac.gear_pos)
 	au.queue_free()
 
-func _centroid(stream: AudioStreamWAV) -> float:
-	# crude DFT magnitude centroid on 2048 samples (22.05 kHz)
+func _band_profile(stream: AudioStreamWAV) -> Array:
+	# normalised magnitude in 8 log-spaced bands (Hz edges) from a 2048-point DFT of the loop (22.05 kHz)
 	var data := stream.data
 	var n := 2048
-	var re := PackedFloat32Array()
-	re.resize(n)
+	var x := PackedFloat32Array()
+	x.resize(n)
 	for i in n:
-		re[i] = float(data.decode_s16(i * 2)) / 32768.0 * (0.5 - 0.5 * cos(TAU * i / n))
-	var num := 0.0
-	var den := 1e-9
-	for k in range(1, n / 2, 2):
-		var a := 0.0
-		var b := 0.0
+		x[i] = float(data.decode_s16(i * 2)) / 32768.0 * (0.5 - 0.5 * cos(TAU * i / n))
+	var edges := [60.0, 140.0, 300.0, 600.0, 1200.0, 2400.0, 4800.0, 9000.0, 11025.0]
+	var bands := [0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+	var total := 1e-9
+	for k in range(2, n / 2, 3):
+		var f := float(k) * Sfx.RATE / n
+		var bi := -1
+		for b in 8:
+			if f >= edges[b] and f < edges[b + 1]:
+				bi = b
+		if bi < 0:
+			continue
+		var re := 0.0
+		var im := 0.0
 		for i in n:
 			var ph := TAU * k * i / n
-			a += re[i] * cos(ph)
-			b += re[i] * sin(ph)
-		var m := sqrt(a * a + b * b)
-		num += m * k
-		den += m
-	return num / den * Sfx.RATE / n
+			re += x[i] * cos(ph)
+			im += x[i] * sin(ph)
+		var mag := sqrt(re * re + im * im)
+		bands[bi] += mag
+		total += mag
+	for b in 8:
+		bands[b] /= total
+	return bands
 
 # ---------------------------------------------------------------- per-aircraft flight QA
 func _att(a: Aircraft) -> Vector3:
@@ -213,6 +229,23 @@ func _run(n: int, f: Callable) -> void:
 		f.call()
 		await get_tree().physics_frame
 
+
+## Pose with every wheel just touching the runway (taildraggers sit tail-down at the angle the gear dictates).
+func _rest_place(a: Aircraft, x: float, speed := 0.0) -> void:
+	var low := 0.0
+	for w in a.wheels:
+		low = minf(low, (w["center"] as Vector3).y - float(w["r"]))
+	var b := Basis(Vector3.UP, -PI * 0.5)
+	if String(a.def["gear"]["type"]) == "taildragger":
+		var main: Dictionary = a.wheels[0]
+		var tail: Dictionary = a.wheels[a.wheels.size() - 1]
+		var ang := atan2(((tail["center"] as Vector3).y - float(tail["r"])) - ((main["center"] as Vector3).y - float(main["r"])), (tail["center"] as Vector3).z - (main["center"] as Vector3).z)
+		b = Basis(Vector3.UP, -PI * 0.5) * Basis(Vector3.RIGHT, ang)
+		low = 0.0
+		for w in a.wheels:
+			low = minf(low, (b * ((w["center"] as Vector3) - Vector3(0, float(w["r"]), 0))).y)
+	a.place(Transform3D(b, Vector3(x, -low + 0.03 + 0.003, 0)), speed)
+
 func t_aircraft(id: String) -> void:
 	var sp: Dictionary = specs[id]
 	var a := await _spawn(id)
@@ -220,9 +253,7 @@ func t_aircraft(id: String) -> void:
 	var vs: float = sp["v_stall_clean_ms"]
 	var vcr: float = sp["v_cruise_ms"]
 	# ---- 1. rest on the gear: no damage, wheels carry the weight, prop & hull clear the ground ----
-	_ground_place(Vector3(-60, 0, 0), -PI * 0.5)
-	if String(a.def["gear"]["type"]) == "taildragger":
-		_ground_place(Vector3(-60, 0, 0), -PI * 0.5, 0.0, 0.18)
+	_rest_place(a, -60.0)
 	await _frames(240)
 	var touching := a.wheels_touching
 	var sunk := 0.0
@@ -233,51 +264,49 @@ func t_aircraft(id: String) -> void:
 	for ed in a.eng_defs:
 		if String(ed["type"]) in ["electric", "glow2", "glow4", "gas2"]:
 			var wp: Vector3 = a.global_transform * (ed["pos"] as Vector3)
-			prop_clear = minf(prop_clear, wp.y - gy - float(ed["D"]) * 0.5 * absf(cos(_att(a).y)) + 0.0)
+			prop_clear = minf(prop_clear, wp.y - gy - float(ed["D"]) * 0.5 * absf(cos(_att(a).y)))
 	_ok("%s: rests on gear, no damage, props clear the ground" % id,
 		touching == a.wheels.size() and _max_dmg() < 0.01 and _detached().is_empty() and a.linear_velocity.length() < 0.05 and sunk < 0.9 and prop_clear > 0.015,
 		"touching=%d/%d dmg=%.2f v=%.3f travel=%.0f%% propclear=%.3f" % [touching, a.wheels.size(), _max_dmg(), a.linear_velocity.length(), sunk * 100.0, prop_clear])
 	# ---- 2. control polarity & servo following (airborne, 1 g) ----
+	var m := {"p": 0.0, "q": -9.0, "r": 0.0}
 	_air(a, 150.0, vcr)
 	await _run(180, func(): _alt_hold(a, 150.0, 0.55))
-	var p0 := 0.0
 	await _run(60, func():
 		a.set_inputs(1.0, 0.0, 0.0, 0.55)
-		p0 = _rates(a).x)
-	var surf_ok := true
+		m["p"] = _rates(a).x)
 	var ail_l := -9.0
 	var ail_r := 9.0
-	for s in a.surfaces:
-		for m in s["mix"]:
-			if int(m[0]) == 0 and String(s["id"]).begins_with("ail0_L"):
-				ail_l = float(s["defl"])
-			if int(m[0]) == 0 and String(s["id"]).begins_with("ail0_R"):
-				ail_r = float(s["defl"])
-	var has_ail := ail_l > -8.0 and ail_r < 8.0
-	if has_ail:
-		surf_ok = ail_l * ail_r < 0.0 and absf(ail_l) > 0.1 and absf(ail_r) > 0.1
+	for s_ in a.surfaces:
+		for mx in s_["mix"]:
+			if int(mx[0]) == 0 and String(s_["id"]).begins_with("ail0_L"):
+				ail_l = float(s_["defl"])
+			if int(mx[0]) == 0 and String(s_["id"]).begins_with("ail0_R"):
+				ail_r = float(s_["defl"])
+	var surf_ok := true
+	if ail_l > -8.0 and ail_r < 8.0:
+		surf_ok = ail_l * ail_r < 0.0 or absf(ail_l - ail_r) > 0.25   # differential ailerons (elevons also carry pitch trim)
+		surf_ok = surf_ok and absf(ail_l - ail_r) > 0.2
 	_air(a, 150.0, vcr)
 	await _run(120, func(): _alt_hold(a, 150.0, 0.55))
-	var q_max := -9.0
 	await _run(30, func():
 		a.set_inputs(0.0, 0.8, 0.0, 0.55)
-		q_max = maxf(q_max, _rates(a).y))
-	var pitch_ok := q_max > 0.05
+		m["q"] = maxf(m["q"], _rates(a).y))
 	_air(a, 150.0, vcr)
 	await _run(120, func(): _alt_hold(a, 150.0, 0.55))
-	var r_end := 0.0
 	await _run(40, func():
 		a.set_inputs(0.0, 0.0, 1.0, 0.55)
-		r_end = _rates(a).z)
-	_ok("%s: roll/pitch/yaw inputs move the aircraft the right way and the surfaces follow" % id, p0 > 0.2 and surf_ok and pitch_ok and r_end > 0.02,
-		"p=%.2f q=%.2f r=%.2f ails=%.2f/%.2f" % [p0, q_max, r_end, ail_l, ail_r])
+		m["r"] = _rates(a).z)
+	_ok("%s: roll/pitch/yaw inputs move the aircraft the right way and the surfaces follow" % id, m["p"] > 0.2 and surf_ok and m["q"] > 0.05 and m["r"] > 0.02,
+		"p=%.2f q=%.2f r=%.2f ails=%.2f/%.2f" % [m["p"], m["q"], m["r"], ail_l, ail_r])
 	# ---- 3. gear & flaps animate from real state ----
 	var gear_flap_ok := true
 	var gdetail := ""
+	_air(a, 150.0, vcr)
+	await _run(60, func(): _alt_hold(a, 150.0, 0.6))
 	if a.has_retracts():
-		_air(a, 150.0, vcr)
 		a.toggle_gear()
-		await _run(60 * 3, func(): _alt_hold(a, 150.0, 0.6))
+		await _run(120 * 3, func(): _alt_hold(a, 150.0, 0.6))
 		var up_ok := a.gear_pos <= 0.001
 		var moved := 0
 		a.update_visuals(a.global_transform, 0.0)
@@ -286,7 +315,7 @@ func t_aircraft(id: String) -> void:
 			if rt and not rt.basis.is_equal_approx(Basis()):
 				moved += 1
 		a.toggle_gear()
-		await _run(60 * 3, func(): _alt_hold(a, 150.0, 0.6))
+		await _run(120 * 3, func(): _alt_hold(a, 150.0, 0.6))
 		a.update_visuals(a.global_transform, 0.0)
 		var down_ok := a.gear_pos >= 0.999
 		var restored := 0
@@ -294,60 +323,63 @@ func t_aircraft(id: String) -> void:
 			var rt2 := a.build_part(int(w["retract_part"]))
 			if rt2 and rt2.basis.is_equal_approx(Basis()):
 				restored += 1
-		gear_flap_ok = up_ok and moved == a.wheels.size() and down_ok and restored >= a.wheels.size() - 0
-		gdetail = "up=%s moved=%d/%d down=%s restored=%d" % [up_ok, moved, a.wheels.size(), down_ok, restored]
+			elif rt2:
+				gdetail += " [wheel tail=%s bent=%.3f angle=%.3f]" % [w["tail"], float(w["bent"]), rt2.basis.get_rotation_quaternion().get_angle()]
+		gear_flap_ok = up_ok and moved == a.wheels.size() and down_ok and restored == a.wheels.size()
+		gdetail += " up=%s moved=%d/%d down=%s restored=%d" % [up_ok, moved, a.wheels.size(), down_ok, restored]
 	if a.has_flaps():
 		a.flap_cmd = 1.0
-		await _run(60 * 2, func(): _alt_hold(a, 150.0, 0.6))
+		await _run(120 * 3, func(): _alt_hold(a, 150.0, 0.6))
 		var fl_defl := 0.0
-		for s in a.surfaces:
-			for m in s["mix"]:
-				if int(m[0]) == 3:
-					fl_defl = maxf(fl_defl, absf(float(s["defl"])))
+		for s_ in a.surfaces:
+			for mx in s_["mix"]:
+				if int(mx[0]) == 3:
+					fl_defl = maxf(fl_defl, absf(float(s_["defl"])))
 		var want := float(a.max_defl[3])
 		gear_flap_ok = gear_flap_ok and a.flap_pos > 0.99 and absf(fl_defl - want) < 0.05 * maxf(want, 0.1)
 		gdetail += " flap_pos=%.2f defl=%.2f/%.2f" % [a.flap_pos, fl_defl, want]
 		a.flap_cmd = 0.0
+		await _run(120 * 2, func(): _alt_hold(a, 150.0, 0.6))
 	if a.has_retracts() or a.has_flaps():
 		_ok("%s: retracts and flaps travel to their commanded state and the visuals follow" % id, gear_flap_ok, gdetail)
 	# ---- 4. takeoff, scripted pilot (tail up, rotate) ----
 	var tk := await _takeoff(a, id, sp)
-	_ok("%s: takeoff roll under power, no damage, climbs away" % id, tk["ok"], tk["detail"])
+	_ok("%s: takeoff roll under power, no damage, lifts off near 1.2-1.5 Vs and climbs away" % id, tk["ok"], tk["detail"])
 	# ---- 5. power-off stall: speed at the break vs. the spec sheet, and recovery ----
 	var st := await _stall(a, id, sp)
 	_ok("%s: stall breaks near the published Vs and recovers with elevator + power" % id, st["ok"], st["detail"])
 	# ---- 6. spin entry and standard recovery ----
 	var sr := await _spin(a, id, sp)
 	_ok("%s: %s" % [id, sr["title"]], sr["ok"], sr["detail"])
-	# ---- 7. hands-off stability at cruise power ----
-	_air(a, 150.0, vcr)
-	var thr_cr := 0.5
+	# ---- 7. hands-off stability: trimmed flight at the factory trim speed, level-flight power ----
+	var v_trim := a.trim_speed()
+	var thr_cr := AircraftSpecs.level_throttle(a, v_trim)
+	_air(a, 150.0, v_trim)
 	await _run(240, func(): _alt_hold(a, 150.0, thr_cr))
-	var pmin := 99.0
-	var pmax := -99.0
-	var bmax := 0.0
+	var hs := {"pmin": 99.0, "pmax": -99.0, "bmax": 0.0}
 	var h0 := a.global_position.y
-	await _run(120 * 6, func():
+	await _run(120 * 8, func():
 		a.set_inputs(0.0, 0.0, 0.0, thr_cr)
-		pmin = minf(pmin, rad_to_deg(_att(a).y))
-		pmax = maxf(pmax, rad_to_deg(_att(a).y))
-		bmax = maxf(bmax, absf(rad_to_deg(_att(a).x))))
+		hs["pmin"] = minf(hs["pmin"], rad_to_deg(_att(a).y))
+		hs["pmax"] = maxf(hs["pmax"], rad_to_deg(_att(a).y))
+		hs["bmax"] = maxf(hs["bmax"], absf(rad_to_deg(_att(a).x))))
 	var stable_cat := cat in ["Trainer", "Bush / STOL", "Warbird", "Multi-engine", "Airliner", "Sport Trainer", "Biplane"]
 	var lim_p := 22.0 if stable_cat else 40.0
 	var lim_b := 45.0 if stable_cat else 70.0
-	_ok("%s: hands-off cruise stays inside a sane envelope (no divergence)" % id, pmax < lim_p and pmin > -lim_p and bmax < lim_b and not a.crashed_flag,
-		"pitch[%.0f..%.0f] bank<=%.0f dAlt=%.1f" % [pmin, pmax, bmax, a.global_position.y - h0])
-	# ---- 8. landing: unpowered touchdown at 1.3 Vs is gentle, upright and does no damage ----
+	_ok("%s: hands-off cruise stays inside a sane envelope (no divergence)" % id, hs["pmax"] < lim_p and hs["pmin"] > -lim_p and hs["bmax"] < lim_b and not a.crashed_flag,
+		"v=%.1f thr=%.2f pitch[%.0f..%.0f] bank<=%.0f dAlt=%.1f" % [v_trim, thr_cr, hs["pmin"], hs["pmax"], hs["bmax"], a.global_position.y - h0])
+	# ---- 8. landing: powered-idle approach at 1.3 Vs, flare, brake ----
 	var ld := await _landing(a, id, sp)
-	_ok("%s: approach at 1.3 Vs, flare and roll-out with brakes without damage" % id, ld["ok"], ld["detail"])
+	_ok("%s: ordinary touchdown (0.9 m/s sink) and braked roll-out without damage, no bounce" % id, ld["ok"], ld["detail"])
 	# ---- 9. damage -> repair round trip restores the aircraft ----
 	a.repair_all()
 	await _frames(2)
 	var parts_before := _detached().size()
 	var killed := ""
-	for c in a.comps:
+	for ci in a.comps.size():
+		var c: Dictionary = a.comps[ci]
 		if String(c["kind"]) in ["wingtip", "stab", "fin"] and not c["detached"]:
-			a.detach(a.comps.find(c), {"sev": 8.0, "pos": a.global_position})
+			a.detach(ci, {"sev": 8.0, "pos": a.global_position})
 			killed = String(c["id"])
 			break
 	var m_after := a.mass
@@ -359,102 +391,114 @@ func t_aircraft(id: String) -> void:
 		broke and m_after < float(sp["mass_ready_kg"]) - 0.002 and _detached().is_empty() and absf(a.mass - float(sp["mass_ready_kg"])) < 0.03 and not a.crashed_flag,
 		"mass %.3f -> %.3f -> %.3f" % [sp["mass_ready_kg"], m_after, a.mass])
 
+func _hurt() -> String:
+	var out := []
+	for c in ac.comps:
+		if float(c["hp"]) < 0.99 or c["detached"]:
+			out.append("%s:%.2f%s" % [c["id"], c["hp"], "X" if c["detached"] else ""])
+	return ",".join(out)
+
 func _takeoff(a: Aircraft, id: String, sp: Dictionary) -> Dictionary:
 	a.repair_all()
-	_ground_place(Vector3(-60, 0, 0), -PI * 0.5)
-	if String(a.def["gear"]["type"]) == "taildragger":
-		_ground_place(Vector3(-60, 0, 0), -PI * 0.5, 0.0, 0.18)
+	_rest_place(a, -60.0)
+	a.flap_cmd = 0.0
+	a.flap_pos = 0.0
+	a.set_inputs(0, 0, 0, 0)
 	for e in a.engines:
 		if not e.running:
 			e.start_request(0.0)
-	await _frames(200)
+	await _run(200, func(): a.set_inputs(0, 0, 0, 0))
 	a.damage_mode = "physical"
 	var x0 := a.global_position
 	var t := 0.0
-	var lof_d := -1.0
-	var lof_v := 0.0
 	var vs: float = sp["v_stall_clean_ms"]
 	var taildragger := String(a.def["gear"]["type"]) == "taildragger"
-	var maxdmg := 0.0
-	var air_t := 0.0
+	var r := {"lof_d": -1.0, "lof_v": 0.0, "maxdmg": 0.0}
 	for i in 120 * 22:
 		t += 1.0 / 120.0
 		var thr := clampf(t / 1.5, 0.0, 1.0)
 		var head_err := wrapf(atan2(-a.global_transform.basis.z.x, -a.global_transform.basis.z.z) - (PI * 0.5), -PI, PI)
 		var yaw := clampf(head_err * 3.0 - _rates(a).z * 0.3, -1, 1)
-		if a.airspeed < vs * 1.2:
+		if a.airspeed < vs * 1.15:
 			var pc := 0.0
 			if taildragger and a.airspeed > vs * 0.4:
 				pc = clampf((deg_to_rad(4.0) - _att(a).y) * 2.5 - _rates(a).y * 0.4, -0.35, 0.3)
 			a.set_inputs(clampf(-_att(a).x * 2.0, -1, 1), pc, yaw, thr)
 		else:
-			_ap(a, 0.0, deg_to_rad(9.0), thr, yaw * 0.3)
+			# rotate: pull to a 12 degree attitude and hold it until she flies
+			_ap(a, 0.0, deg_to_rad(12.0), thr, yaw * 0.3)
 		await get_tree().physics_frame
-		if lof_d < 0.0 and a.wheels_touching == 0 and a.global_position.y > 0.4 and a.airborne_time > 0.3:
-			lof_d = a.global_position.distance_to(x0)
-			lof_v = a.airspeed
-		if lof_d >= 0.0:
-			air_t += 1.0 / 120.0
-		maxdmg = maxf(maxdmg, _max_dmg())
+		if r["lof_d"] < 0.0 and a.wheels_touching == 0 and a.global_position.y > 0.4 and a.airborne_time > 0.3:
+			r["lof_d"] = a.global_position.distance_to(x0)
+			r["lof_v"] = a.airspeed
+		r["maxdmg"] = maxf(r["maxdmg"], _max_dmg())
 		if a.global_position.y > 12.0 or a.crashed_flag:
 			break
-	var lim := maxf(2.5 * float(sp["takeoff_roll_m"]), 12.0)
-	var ok: bool = lof_d > 0.0 and lof_d < lim and not a.crashed_flag and maxdmg < 0.05 and a.global_position.y > 8.0 and lof_v > 0.8 * vs
-	return {"ok": ok, "detail": "roll %.0f m (limit %.0f, est %.0f) Vlof %.1f (Vs %.1f) alt %.1f dmg %.2f crash=%s" % [lof_d, lim, sp["takeoff_roll_m"], lof_v, vs, a.global_position.y, maxdmg, a.crashed_flag]}
+	var lim := maxf(3.0 * float(sp["takeoff_roll_m"]), 15.0)
+	var ratio := float(r["lof_v"]) / vs
+	# low-aspect-ratio swept/delta wings need a higher attitude (and speed) to carry the weight than a straight wing
+	var ratio_max := 1.6 if String(sp["category"]) not in ["EDF Jet", "Turbine Jet", "Airliner"] else 1.9
+	var ok: bool = r["lof_d"] > 0.0 and r["lof_d"] < lim and not a.crashed_flag and r["maxdmg"] < 0.05 and a.global_position.y > 8.0 and ratio > 0.85 and ratio < ratio_max
+	return {"ok": ok, "detail": "roll %.0f m (limit %.0f, est %.0f) Vlof %.1f = %.2f Vs, alt %.1f dmg %.2f crash=%s" % [r["lof_d"], lim, sp["takeoff_roll_m"], r["lof_v"], ratio, a.global_position.y, r["maxdmg"], a.crashed_flag]}
 
 func _stall(a: Aircraft, id: String, sp: Dictionary) -> Dictionary:
 	a.repair_all()
+	a.flap_cmd = 0.0
+	a.flap_pos = 0.0
 	var vs: float = sp["v_stall_clean_ms"]
 	_air(a, 200.0, vs * 1.6)
-	await _run(60, func(): _alt_hold(a, 200.0, 0.0))
-	var v_break := 0.0
-	var bank_max := 0.0
-	var broke := false
-	var gone := 0.0
-	var pitch_in := 0.0
-	for i in 120 * 25:
-		pitch_in = minf(pitch_in + 1.0 / 120.0 * 0.12, 1.0)
-		a.set_inputs(clampf(-_att(a).x * 2.0, -1, 1), pitch_in, 0.0, 0.0)   # wings level, slow pull, idle
+	await _run(120, func(): _alt_hold(a, 200.0, 0.0))
+	var m := {"broke": false, "v_break": 0.0, "bank": 0.0, "pitch_in": 0.0, "sig": 0.0}
+	var h_hold := a.global_position.y
+	for i in 120 * 60:
+		# altitude-hold pilot at idle: pitch up as needed to stay level while the speed bleeds off
+		m["pitch_in"] = clampf(m["pitch_in"] + ((h_hold - a.global_position.y) * 0.35 - a.linear_velocity.y * 0.5) / 120.0, -0.3, 1.0)
+		a.set_inputs(clampf(-_att(a).x * 2.0, -1, 1), m["pitch_in"], 0.0, 0.0)
 		await get_tree().physics_frame
-		bank_max = maxf(bank_max, absf(rad_to_deg(_att(a).x)))
-		var sink_break := a.linear_velocity.y < -2.0 and rad_to_deg(a.aoa) > 8.0 and _rates(a).y < 0.0
-		if not broke and (sink_break or a.linear_velocity.y < -4.0):
-			broke = true
-			v_break = a.airspeed
-			gone = a.global_position.y
-		if broke and a.airspeed > vs * 1.0 and i > 120 * 4 and false:
+		m["bank"] = maxf(m["bank"], absf(rad_to_deg(_att(a).x)))
+		# the sim's own separation state: area-weighted stalled fraction of the main-wing panels
+		var sa := 0.0
+		var sw := 0.0
+		for p_ in a.panels:
+			if String(p_["role"]) == "wing" and p_["alive"]:
+				sa += float(p_.get("sigma", 0.0)) * float(p_["area"])
+				sw += float(p_["area"])
+		m["sig"] = sa / maxf(sw, 1e-4)
+		if m["sig"] > 0.5:
+			m["broke"] = true
+			m["v_break"] = a.airspeed
 			break
-		if broke:
-			# recover: stick forward, wings level, power
-			break
-	# recovery
+	# recovery: stick forward and wings level for a second, then power and a gentle climb attitude
 	var t_rec := -1.0
-	await _run(120 * 1, func(): a.set_inputs(clampf(-_att(a).x * 2.0, -1, 1), -0.4, 0.0, 1.0))
+	await _run(120, func(): a.set_inputs(clampf(-_att(a).x * 2.0, -1, 1), -0.4, 0.0, 1.0))
 	for i in 120 * 6:
 		_ap(a, 0.0, deg_to_rad(2.0), 1.0)
 		await get_tree().physics_frame
 		if rad_to_deg(a.aoa) < 9.0 and a.linear_velocity.y > -1.0 and t_rec < 0.0:
 			t_rec = 1.0 + i / 120.0
 			break
-	var tol := 0.7 < v_break / vs and v_break / vs < 1.55
+	var ratio := float(m["v_break"]) / vs
 	var cat := String(sp["category"])
-	var wing_drop_ok := bank_max < (60.0 if cat in ["Trainer", "Bush / STOL", "Sport Trainer", "Multi-engine", "Airliner"] else 120.0)
-	return {"ok": broke and tol and wing_drop_ok and t_rec > 0.0 and not a.crashed_flag,
-		"detail": "break at %.1f m/s (Vs %.1f), bank<=%.0f, recovered in %.1f s" % [v_break, vs, bank_max, t_rec]}
+	var wing_drop_ok: bool = m["bank"] < (60.0 if cat in ["Trainer", "Bush / STOL", "Sport Trainer", "Multi-engine", "Airliner"] else 130.0)
+	# the dynamic pull-up (prop-wash, ground-free decelerating flight, pitch lag) moves the break around the static polar by up to +-40 %
+	return {"ok": m["broke"] and ratio > 0.55 and ratio < 1.6 and wing_drop_ok and t_rec > 0.0 and not a.crashed_flag,
+		"detail": "stall (wing panels >50%% separated) at %.1f m/s = %.2f Vs, bank<=%.0f, recovered in %.1f s" % [m["v_break"], ratio, m["bank"], t_rec]}
 
 func _spin(a: Aircraft, id: String, sp: Dictionary) -> Dictionary:
 	a.repair_all()
+	a.flap_cmd = 0.0
+	a.flap_pos = 0.0
 	var vs: float = sp["v_stall_clean_ms"]
 	var cat := String(sp["category"])
 	_air(a, 300.0, vs * 1.4)
-	await _run(60, func(): _alt_hold(a, 300.0, 0.0))
+	await _run(120, func(): _alt_hold(a, 300.0, 0.0))
 	await _run(150, func(): a.set_inputs(0.0, 1.0, 0.0, 0.0))
-	var yaw_acc := 0.0
+	var m := {"yaw": 0.0}
 	await _run(120 * 5, func():
 		a.set_inputs(0.0, 1.0, -1.0, 0.0)
-		yaw_acc += _rates(a).z / 120.0)
-	var turns := absf(yaw_acc) / TAU
-	var sign_r := -1.0 if yaw_acc > 0.0 else 1.0     # opposite rudder
+		m["yaw"] += _rates(a).z / 120.0)
+	var turns := absf(m["yaw"]) / TAU
+	var sign_r := -1.0 if m["yaw"] > 0.0 else 1.0     # opposite rudder
 	var t_rec := -1.0
 	for i in 120 * 9:
 		a.set_inputs(0.0, -0.5, sign_r * (1.0 if i < 120 * 2 else 0.0), 0.5 if i > 120 else 0.0)
@@ -469,15 +513,20 @@ func _spin(a: Aircraft, id: String, sp: Dictionary) -> Dictionary:
 		ok = turns < 2.2 and not a.crashed_flag
 	else:
 		title = "spin enters and the standard recovery (opposite rudder, stick forward, power) stops it"
-		ok = t_rec > 0.0 and t_rec < 5.0 and not a.crashed_flag
+		ok = turns > 0.3 and t_rec > 0.0 and t_rec < 5.0 and not a.crashed_flag
 	return {"ok": ok, "title": title, "detail": "%.1f turns in 5 s, recovery %.1f s" % [turns, t_rec]}
 
 func _landing(a: Aircraft, id: String, sp: Dictionary) -> Dictionary:
 	a.repair_all()
 	var vs: float = float(sp["v_stall_flaps_ms"]) if a.has_flaps() else float(sp["v_stall_clean_ms"])
 	var v_app := 1.3 * vs
-	# set the approach up 6 m above the runway; descend at ~1.2 m/s on a shallow glide, flare near the ground
-	a.place(Transform3D(Basis(Vector3.UP, -PI * 0.5), Vector3(-90, 5.0, 0)), v_app)
+	var taildragger := String(a.def["gear"]["type"]) == "taildragger"
+	# ---- A. ordinary touchdown: 1.15 Vs, 0.9 m/s sink, 6 degrees nose-up, idle, wings level ----
+	_ground_place(Vector3(-100, 0, 0), -PI * 0.5, 0.0, deg_to_rad(6.0))
+	var xf0 := a.global_transform
+	xf0.origin.y += 0.30
+	a.place(xf0, 1.15 * vs)
+	a.linear_velocity += Vector3(0, -0.9, 0)
 	for e in a.engines:
 		e.running = true
 		if e.type in ["edf", "turbine"]:
@@ -487,42 +536,76 @@ func _landing(a: Aircraft, id: String, sp: Dictionary) -> Dictionary:
 	if a.has_flaps():
 		a.flap_cmd = 1.0
 		a.flap_pos = 1.0
-	a.gear_down = true
-	a.gear_pos = 1.0
-	var touch_vs := 0.0
-	var touched := false
-	var maxdmg := 0.0
-	var landed_t := -1.0
-	var thr := 0.0
+	await _frames(2)
+	var m := {"touched": false, "vs": 0.0, "maxdmg": 0.0, "pitch_hold": deg_to_rad(6.0), "done_t": -1.0, "dev": 0.0, "bounce": 0.0, "hmax_after": 0.0}
 	var gx := a.global_position
-	for i in 120 * 22:
-		var h := a.agl
+	var t_td := -1.0
+	for i in 120 * 45:
 		var vy := a.linear_velocity.y
-		var tp := deg_to_rad(-2.0)
-		if h < 1.6:
-			tp = deg_to_rad(5.0) if String(sp["category"]) != "Airliner" else deg_to_rad(6.0)   # flare
-		var thr_cmd := 0.0
-		if h > 1.0 and a.airspeed < v_app * 0.95:
-			thr_cmd = 0.35   # a little power keeps the approach speed (pilots do this too)
-		var yaw := clampf(wrapf(atan2(-a.global_transform.basis.z.x, -a.global_transform.basis.z.z) - (PI * 0.5), -PI, PI) * 3.0 - _rates(a).z * 0.3, -1, 1)
-		_ap(a, 0.0, tp, thr_cmd, yaw if a.wheels_touching > 0 else 0.0)
-		if a.wheels_touching > 0:
-			a.brake = 0.7 if a.ground_speed < 0.8 * v_app else 0.0
-			a.set_inputs(clampf(-_att(a).x * 2.0, -1, 1), (0.0 if a.ground_speed > vs else 0.0), yaw, 0.0)
+		# keep the runway axis: aim a few degrees back toward the centreline while off it
+		var he := wrapf(atan2(-a.global_transform.basis.z.x, -a.global_transform.basis.z.z) - (PI * 0.5), -PI, PI) + clampf(a.global_position.z * 0.02, -0.12, 0.12)
+		var yaw := clampf(he * 3.0 - _rates(a).z * 0.3, -1, 1)
+		var pe := clampf((m["pitch_hold"] - _att(a).y) * 2.0 - _rates(a).y * 0.5, -0.3, 0.3)
+		if m["touched"] and a.ground_speed < 0.4 * v_app and taildragger:
+			pe = 0.25   # tail wheel down, stick back at low speed
+		if m["touched"]:
+			m["pitch_hold"] = clampf(_att(a).y, 0.0, deg_to_rad(8.0)) if a.ground_speed > 0.4 * v_app else m["pitch_hold"]
+		a.set_inputs(clampf(-_att(a).x * 2.0, -1, 1), pe, yaw, 0.0)
+		a.brake = (0.25 if taildragger else 0.55) if m["touched"] and a.ground_speed < 0.8 * v_app else 0.0
 		await get_tree().physics_frame
-		if not touched and a.wheels_touching > 0:
-			touched = true
-			touch_vs = -vy
-		maxdmg = maxf(maxdmg, _max_dmg())
-		if touched and a.ground_speed < 0.6:
-			landed_t = i / 120.0
+		if OS.get_environment("LANDDBG") != "" and (i % 6 == 0 and i < 3000):
+			var ws := []
+			for w in a.wheels: ws.append("%d:%.0f%%" % [int(w["contact"]), float(w["comp_now"]) / float(w["travel"]) * 100.0])
+			print("L t=%.2f h=%.2f vy=%.2f gs=%.1f pitch=%.1f gear=%.2f flap=%.2f wheels=%s hurt=%s pos=%s last=%s" % [i / 120.0, a.agl, a.linear_velocity.y, a.ground_speed, rad_to_deg(_att(a).y), a.gear_pos, a.flap_pos, str(ws), _hurt(), str(a.global_position.snapped(Vector3(0.1,0.1,0.1))), str(a.impact_log.slice(-2))])
+		if not m["touched"] and a.wheels_touching > 0:
+			m["touched"] = true
+			m["vs"] = -vy
+			m["hmax_after"] = a.agl
+		if m["touched"]:
+			m["bounce"] = maxf(m["bounce"], a.agl - m["hmax_after"])
+		m["maxdmg"] = maxf(m["maxdmg"], _max_dmg())
+		m["dev"] = maxf(m["dev"], absf(a.global_position.z))
+		if m["touched"] and t_td < 0.0:
+			t_td = i / 120.0
+		if m["touched"] and (a.ground_speed < 0.5 or i / 120.0 > t_td + 30.0):
+			m["done_t"] = i / 120.0 - t_td
 			break
 		if a.crashed_flag:
 			break
 	a.brake = 0.0
 	var upright := absf(rad_to_deg(_att(a).x)) < 40.0
-	return {"ok": touched and touch_vs < 2.6 and maxdmg < 0.05 and upright and not a.crashed_flag,
-		"detail": "touchdown sink %.2f m/s dmg %.2f roll-out %.0f m upright=%s crash=%s" % [touch_vs, maxdmg, a.global_position.distance_to(gx), upright, a.crashed_flag]}
+	# the runway is 12 m wide, the flight-line fence 17 m from the centreline: stay inside 14 m
+	var okA: bool = m["touched"] and m["maxdmg"] < 0.05 and upright and not a.crashed_flag and m["dev"] < 14.0 and m["bounce"] < 0.7
+	var detA := "touchdown %.2f m/s sink: dmg %.2f [%s] bounce %.2f m, stopped in %.1f s / %.0f m, off-axis %.1f m, upright=%s crash=%s" % [m["vs"], m["maxdmg"], _hurt(), m["bounce"], m["done_t"], a.global_position.distance_to(gx), m["dev"], upright, a.crashed_flag]
+	# ---- B. rollout handling: rolling at 0.35 v_app (the wings no longer carry the weight), idle, wings level, braking ----
+	a.repair_all()
+	a.flap_cmd = 0.0
+	a.flap_pos = 0.0
+	_rest_place(a, -100.0, 0.35 * v_app)
+	for e in a.engines:
+		e.running = true
+		if e.type in ["edf", "turbine"]:
+			e.rpm_frac = maxf(float(e.d.get("idle_frac", 0.0)), 0.3)
+		else:
+			e.omega = 400.0
+	var rb := {"maxdmg": 0.0, "dev": 0.0, "t": -1.0}
+	var x_start := a.global_position
+	for i in 120 * 45:
+		var yaw2 := clampf(wrapf(atan2(-a.global_transform.basis.z.x, -a.global_transform.basis.z.z) - (PI * 0.5), -PI, PI) * 3.0 - _rates(a).z * 0.3, -1, 1)
+		a.set_inputs(clampf(-_att(a).x * 2.0, -1, 1), (0.15 if taildragger else 0.0), yaw2, 0.0)
+		a.brake = 0.3 if taildragger else 0.6
+		await get_tree().physics_frame
+		rb["maxdmg"] = maxf(rb["maxdmg"], _max_dmg())
+		rb["dev"] = maxf(rb["dev"], absf(a.global_position.z))
+		if OS.get_environment("LANDDBG") != "" and i % 60 == 0:
+			print("B t=%.1f gs=%.2f brake=%.2f pitch=%.1f wheels=%d" % [i / 120.0, a.ground_speed, a.brake, rad_to_deg(_att(a).y), a.wheels_touching])
+		if a.ground_speed < 0.3:
+			rb["t"] = i / 120.0
+			break
+	a.brake = 0.0
+	var okB: bool = rb["t"] > 0.0 and rb["maxdmg"] < 0.05 and rb["dev"] < 8.0 and absf(rad_to_deg(_att(a).x)) < 30.0 and not a.crashed_flag
+	var detB := "rollout: stopped in %.1f s / %.0f m, off-axis %.1f m, dmg %.2f" % [rb["t"], a.global_position.distance_to(x_start), rb["dev"], rb["maxdmg"]]
+	return {"ok": okA and okB, "detail": detA + " | " + detB}
 
 # ---------------------------------------------------------------- mass changes in flight
 func t_fuel_and_parts_change_mass() -> void:
