@@ -38,7 +38,7 @@ simulation's own geometry and models** by `scripts/aircraft/aircraft_specs.gd` (
 | Striker 16 | Turbine Jet | 1.50 | 2.40 | 79 | 592 | 2.9 | 12.74 | 162 | 25 | 11 | 0 |
 | Specter 22 | EDF Jet | 0.88 | 1.20 | 32 | 423 | 2.4 | 3.02 | 95 | 24 | 10 | 0 |
 | Brute 10 | EDF Jet | 1.45 | 1.30 | 35 | 245 | 6.0 | 3.74 | 107 | 26 | 26 | 15 |
-| Cargomaster 130 | Multi-engine | 2.05 | 1.60 | 48 | 241 | 8.7 | 4.86 | 101 | 25 | 58 | 0 |
+| Cargomaster 130 | Multi-engine | 2.05 | 2.10 | 48 | 241 | 8.7 | 4.86 | 101 | 25 | 65 | 0 |
 | Skyliner 74 | Airliner | 1.95 | 1.90 | 62 | 362 | 6.1 | 5.64 | 90 | 24 | 26 | 0 |
 | Mach Arrow SST | Airliner | 0.92 | 2.05 | 51 | 702 | 1.7 | 4.46 | 87 | 17 | 6 | 0 |
 
@@ -57,8 +57,8 @@ simulation's own geometry and models** by `scripts/aircraft/aircraft_specs.gd` (
 | Striker 16 | turbine 120 N x1 | 120.0 | 0.96 | 377 | 14.6 | 14.6 | 18.9 | 38.1 | 73.1 | 15.1 | 18 | 18.4 |
 | Specter 22 | 2601 W in x2 | 31.6 | 1.07 | 861 | 10.9 | 10.8 | 14.0 | 27.5 | 38.5 | 9.6 | 10 | 5.1 |
 | Brute 10 | 2526 W in x2 | 31.8 | 0.87 | 676 | 12.8 | 10.9 | 14.2 | 22.7 | 31.7 | 7.4 | 19 | 5.3 |
-| Cargomaster 130 | 1248 W in x4 | 53.4 | 1.12 | 257 | 11.5 | 9.8 | 12.7 | 11.8 | 26.2 | 7.6 | 13 | 15.7 |
-| Skyliner 74 | 2138 W in x4 | 46.9 | 0.85 | 379 | 11.6 | 9.6 | 12.5 | 22.5 | 31.3 | 7.0 | 16 | 5.6 |
+| Cargomaster 130 | 1248 W in x4 | 53.4 | 1.12 | 257 | 11.4 | 9.7 | 12.7 | 11.6 | 26.2 | 7.6 | 13 | 15.7 |
+| Skyliner 74 | 2138 W in x4 | 46.9 | 0.85 | 379 | 11.6 | 9.6 | 12.5 | 22.5 | 31.4 | 7.0 | 16 | 5.6 |
 | Mach Arrow SST | 2675 W in x4 | 44.5 | 1.02 | 600 | 10.9 | 10.9 | 14.2 | 25.0 | 36.0 | 7.7 | 11 | 5.4 |
 
 ## Verification
