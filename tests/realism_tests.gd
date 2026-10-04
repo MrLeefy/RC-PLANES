@@ -72,6 +72,16 @@ func t_spec_sheets() -> void:
 		if not (Ix > 0.0 and Iy > 0.0 and Iz > 0.0 and Iy <= 1.02 * (Ix + Iz) and Ix <= 1.02 * (Iy + Iz) and Iz <= 1.02 * (Ix + Iy)):
 			bad_mass.append("%s inertia %.4f/%.4f/%.4f" % [d["id"], Ix, Iy, Iz])
 	_ok("specs: all 16 inside category RC envelopes (wing loading, T/W, Vs, CG)", bad_env.is_empty(), str(bad_env))
+	# scale-model fidelity: length/span of the replicas that copy a real type (published dimensions, +-8 %)
+	var real_ls := {"skylark": 7.31 / 10.17, "belle51": 9.83 / 11.28, "specter22": 18.9 / 13.56, "brute10": 16.26 / 17.53,
+		"striker16": 15.03 / 9.96, "macharrow": 61.66 / 25.6, "skyliner": 70.66 / 64.44, "cargo130": 29.79 / 40.41, "tundra_cub": 6.88 / 10.73}
+	var bad_ratio := []
+	for id in real_ls:
+		var spr: Dictionary = specs[id]
+		var got := float(spr["length_m"]) / float(spr["span_m"])
+		if absf(got / float(real_ls[id]) - 1.0) > 0.08:
+			bad_ratio.append("%s L/b %.2f vs real %.2f" % [id, got, real_ls[id]])
+	_ok("scale: length/span of the replicas matches the real types within 8 %", bad_ratio.is_empty(), str(bad_ratio))
 	_ok("specs: mass book-keeping adds up and inertia is physical", bad_mass.is_empty(), str(bad_mass))
 	_ok("specs: no hidden lead - ballast <= 3 % of ready mass everywhere", worst_ballast <= 0.03, "worst %.1f %%" % (worst_ballast * 100.0))
 	# derived numbers are internally consistent with the sim: Vs from the polar must bracket Vcruise < Vtop
