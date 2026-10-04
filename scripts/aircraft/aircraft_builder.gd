@@ -543,6 +543,9 @@ func _build_canopy() -> void:
 	var yb := float(cd["y"])
 	var tint: Color = cd.get("tint", Color(0.1, 0.12, 0.15))
 	var can := _add_comp("canopy", core, "canopy", 0.6)
+	if style == "airliner":
+		_build_airliner_windscreen(can, core, z0, z1)
+		return
 	var segs := 16
 	var rows := []
 	var n := 14
@@ -606,6 +609,62 @@ func _build_canopy() -> void:
 		pk.add_ellipsoid(Vector3(0, head_y, pz), Vector3(ps * 0.42, ps * 0.46, ps * 0.44), 10, 6, MeshKit.const_color(helmet), Basis(), true)
 		pk.add_ellipsoid(Vector3(0, head_y - ps * 0.02, pz - ps * 0.3), Vector3(ps * 0.3, ps * 0.2, ps * 0.14), 8, 4, MeshKit.const_color(_lin(Color(0.05, 0.05, 0.06))), Basis(), true)
 		pk.add_ellipsoid(Vector3(0, head_y - ps * 0.75, pz + ps * 0.1), Vector3(ps * 0.6, ps * 0.42, ps * 0.4), 10, 6, MeshKit.const_color(_lin(Color(0.22, 0.28, 0.2))), Basis(), true)
+
+## Flush airliner / transport flight-deck glazing: dark glass panes that wrap the nose crown 1.5 mm proud of the fuselage skin,
+## separated by thin frame mullions, with an opaque dark backing so it reads as a windscreen rather than a hole.
+func _build_airliner_windscreen(can: int, core: int, z0: float, z1: float) -> void:
+	var nz := 10
+	var na := 12
+	var a0 := deg_to_rad(32.0)
+	var a1 := deg_to_rad(148.0)
+	var panes := 5
+	var rows_back := []
+	var rows_glass := []
+	for i in nz + 1:
+		var t := float(i) / nz
+		# the aft edge is swept: the side panes end further aft than the centre ones
+		var z := lerpf(z0, z1, t)
+		var fp := _fus_param(z)
+		var e := 2.0 / maxf(float(fp[3]), 1.0)
+		var rb := PackedVector3Array()
+		var rg := PackedVector3Array()
+		for k in na + 1:
+			var a := lerpf(a0, a1, float(k) / na)
+			var c := cos(a)
+			var sn := sin(a)
+			var base := Vector3(signf(c) * pow(absf(c), e) * float(fp[0]), signf(sn) * pow(absf(sn), e) * float(fp[1]) + float(fp[2]), z)
+			var nrm := Vector3(c / maxf(float(fp[0]), 0.01), sn / maxf(float(fp[1]), 0.01), 0.0).normalized()
+			rb.append(base + nrm * 0.0008)
+			rg.append(base + nrm * 0.0016 * length / 1.5 + nrm * 0.0006)
+		rows_back.append(rb)
+		rows_glass.append(rg)
+	var bk := _kit(_comp_part(can), "cockpit")
+	var st0 := bk.verts.size()
+	bk.add_grid(rows_back, false, MeshKit.const_color(Color(0.015, 0.018, 0.022)))
+	_grow_kit(can, bk, st0)
+	var gk := _kit(_comp_part(can), "glass")
+	var st1 := gk.verts.size()
+	gk.add_grid(rows_glass, false, MeshKit.const_color(Color.WHITE))
+	_grow_kit(can, gk, st1)
+	# frame: arch round the front and rear edges plus mullions between the panes
+	var fk := _kit(_comp_part(can), "body")
+	var th := 0.0022 * length
+	for ri in [0, nz]:
+		var ring: PackedVector3Array = rows_glass[ri]
+		for k in na:
+			fk.add_cylinder(ring[k], ring[k + 1], th, th, 4, _pfn("frame"), false, true)
+	for m in range(1, panes):
+		var kk := int(round(float(m) / panes * na))
+		for i in nz:
+			fk.add_cylinder((rows_glass[i] as PackedVector3Array)[kk], (rows_glass[i + 1] as PackedVector3Array)[kk], th, th, 4, _pfn("frame"), false, true)
+	# flight crew silhouettes behind the glass
+	if lod_detail >= 1:
+		var zc := lerpf(z0, z1, 0.55)
+		var fpc := _fus_param(zc)
+		var ps := clampf(float(fpc[0]) * 0.28, 0.012, 0.03)
+		var pk := _kit(_comp_part(core), "plastic")
+		for sx in [-1.0, 1.0]:
+			pk.add_ellipsoid(Vector3(sx * float(fpc[0]) * 0.38, float(fpc[2]) + float(fpc[1]) * 0.52, zc), Vector3(ps * 0.42, ps * 0.46, ps * 0.44), 8, 5, MeshKit.const_color(_lin(Color(0.55, 0.45, 0.38))), Basis(), true)
 
 # ---------------------------------------------------------------- lifting surfaces
 ## Generic lifting-surface description.

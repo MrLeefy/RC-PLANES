@@ -81,6 +81,7 @@ var sim_t := 0.0
 var wing_cl := 0.0
 var g_load := 1.0
 var last_vel := Vector3.ZERO
+var vel_prev := Vector3.ZERO   # velocity one physics step earlier: the pre-solve impact speed
 var foliage: Array = []
 var foliage_sensor: Area3D
 
@@ -513,6 +514,7 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		aoa = atan2(-air_l.y, -air_l.z)
 		beta = atan2(air_l.x, -air_l.z)
 	var acc := (v_w - last_vel) / maxf(dt, 1e-4)
+	vel_prev = last_vel
 	last_vel = v_w
 	g_load = lerpf(g_load, (Bt * (acc + Vector3(0, G, 0))).y / G, 0.1)
 	# ---- ground height (single ray) ----
@@ -1250,6 +1252,9 @@ func _contacts(state: PhysicsDirectBodyState3D) -> void:
 		var n := state.get_contact_local_normal(i).normalized()
 		var v_rel := state.get_contact_local_velocity_at_position(i) - state.get_contact_collider_velocity_at_position(i)
 		var closing := maxf(-v_rel.dot(n), 0.0)
+		if not is_wheel:
+			# the reported relative velocity is post-solve; a discrete step can swallow most of a fast impact, so take the pre-solve speed
+			closing = maxf(closing, -vel_prev.dot(n))
 		var J := state.get_contact_impulse(i).length()
 		var pos := state.get_contact_collider_position(i)
 		var collider := state.get_contact_collider_object(i)
@@ -1405,6 +1410,9 @@ func _damage(ci: int, sev: float, pos: Vector3, n: Vector3, kind: String, transm
 			_request_detach(ci, {"sev": sev, "pos": pos, "cause": kind, "normal": n})
 	elif ci == 0 and sev > th.y * 1.5 and not crashed_flag:
 		_crash({"sev": sev, "pos": pos, "cause": kind})
+	elif ci == 0 and float(c["hp"]) < 0.4 and max_impact > th.y and not crashed_flag:
+		# the fuselage took most of its strength in one impact (spread over several solver steps): the airframe is wrecked
+		_crash({"sev": maxf(sev, max_impact), "pos": pos, "cause": kind})
 
 func _apply_component_health(ci: int) -> void:
 	var c: Dictionary = comps[ci]
