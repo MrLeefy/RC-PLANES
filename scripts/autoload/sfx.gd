@@ -60,7 +60,8 @@ func _set_bus(name: String, v: float) -> void:
 func build_bank_async(progress: Callable) -> void:
 	var names := ["electric", "edf", "edf_noise", "glow2", "glow4", "gas2", "turbine", "turbine_roar", "prop_swish",
 		"wind", "ambience", "scrape", "roll_asphalt", "roll_grass", "impact_foam", "impact_wood", "impact_composite",
-		"impact_metal", "thud", "gear", "branch", "starter", "click", "beep", "leaves"]
+		"impact_metal", "thud", "gear", "branch", "starter", "click", "beep", "leaves",
+		"servo", "retract_motor", "tire_chirp", "brake_squeal", "esc_arm", "gear_lock"]
 	DirAccess.make_dir_recursive_absolute(CACHE_DIR)
 	var i := 0
 	for n in names:
@@ -218,6 +219,12 @@ func _synth(name: String) -> AudioStreamWAV:
 		"click": return _click(0.02, 1600.0)
 		"beep": return _click(0.12, 880.0)
 		"leaves": return _leaves()
+		"servo": return _servo()
+		"retract_motor": return _retract_motor()
+		"tire_chirp": return _tire_chirp()
+		"brake_squeal": return _brake_squeal()
+		"esc_arm": return _esc_arm()
+		"gear_lock": return _impact(0.01, 0.07, 640.0, 47, 0.7)
 	return null
 
 func _electric() -> AudioStreamWAV:
@@ -440,4 +447,78 @@ func _leaves() -> AudioStreamWAV:
 	for i in n:
 		var t := float(i) / RATE
 		out[i] *= (0.4 + (1.0 if m[i] > 0.7 else 0.0)) * sin(PI * t / 0.7)
+	return _wav(out, false)
+
+## Hobby servo: 50 Hz drive pulses with a gear-train buzz (about 2.4 kHz) and motor hiss. Looped; the
+## player's volume follows how fast the control surfaces are being driven.
+func _servo() -> AudioStreamWAV:
+	var n := RATE
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var nz := _noise_buf(n, 45)
+	_lp(nz, 0.5)
+	for i in n:
+		var t := float(i) / RATE
+		var ph := fposmod(t * 50.0, 1.0)
+		var pulse := exp(-ph * 9.0)
+		var buzz := sin(TAU * 2400.0 * t) * 0.35 + sin(TAU * 4800.0 * t) * 0.14 + sin(TAU * 1200.0 * t + sin(TAU * 7.0 * t) * 0.8) * 0.2
+		out[i] = buzz * (0.45 + 0.55 * pulse) + nz[i] * 0.3
+	return _wav(out, true)
+
+## Electric retract unit / gear-door actuator: motor whine with a slight beat and gear-train grind.
+func _retract_motor() -> AudioStreamWAV:
+	var n := RATE
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var nz := _noise_buf(n, 46)
+	_lp(nz, 0.3)
+	for i in n:
+		var t := float(i) / RATE
+		var w := sin(TAU * 310.0 * t) * 0.4 + sin(TAU * 620.0 * t) * 0.25 + sin(TAU * 933.0 * t) * 0.12
+		var grind := sin(TAU * 31.0 * t) * 0.2
+		out[i] = (w + grind) * (0.8 + 0.2 * sin(TAU * 4.0 * t)) + nz[i] * 0.2
+	return _wav(out, true)
+
+## Rubber tyre touching down: short high chirp + thump.
+func _tire_chirp() -> AudioStreamWAV:
+	var n := int(RATE * 0.35)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var nz := _noise_buf(n, 48)
+	_lp(nz, 0.5)
+	var ph := 0.0
+	for i in n:
+		var t := float(i) / RATE
+		var f := 1500.0 - 900.0 * minf(t / 0.2, 1.0)
+		ph += TAU * f / RATE
+		var chirp := sin(ph) * exp(-t / 0.07) * 0.6
+		var thump := sin(TAU * 85.0 * t * (1.0 - t)) * exp(-t / 0.05) * 0.9
+		out[i] = chirp + thump + nz[i] * exp(-t / 0.02) * 0.5
+	return _wav(out, false)
+
+## Locked-wheel / hard braking tyre squeal: harmonically rich, wavering.
+func _brake_squeal() -> AudioStreamWAV:
+	var n := RATE
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var nz := _noise_buf(n, 49)
+	_lp(nz, 0.35)
+	for i in n:
+		var t := float(i) / RATE
+		var f := 1100.0 + 60.0 * sin(TAU * 3.0 * t)
+		out[i] = sin(TAU * f * t) * 0.4 + sin(TAU * f * 2.01 * t) * 0.22 + sin(TAU * f * 3.02 * t) * 0.1 + nz[i] * 0.3
+	return _wav(out, true)
+
+## ESC arming: the motor itself "sings" a rising three-note beep (standard motor start-up tune).
+func _esc_arm() -> AudioStreamWAV:
+	var n := int(RATE * 0.75)
+	var out := PackedFloat32Array()
+	out.resize(n)
+	var notes := [1760.0, 2200.0, 2640.0]
+	for i in n:
+		var t := float(i) / RATE
+		var k := mini(int(t / 0.22), 2)
+		var tt := t - k * 0.22
+		var env := minf(tt / 0.01, 1.0) * clampf((0.18 - tt) / 0.03, 0.0, 1.0)
+		out[i] = (sin(TAU * notes[k] * t) + 0.35 * sin(TAU * notes[k] * 2.0 * t)) * env
 	return _wav(out, false)

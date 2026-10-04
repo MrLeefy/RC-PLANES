@@ -30,6 +30,21 @@ func _physics_process(delta: float) -> void:
 func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	if not active:
 		return
+	# Thin pieces move several cm per physics step; with CCD off (Jolt's sweep teleports them) a hard
+	# ground hit could skip through the heightfield. Keep them on the right side of the terrain.
+	var p := state.transform.origin
+	if is_instance_valid(Game.field) and absf(p.x) < Field.HALF and absf(p.z) < Field.HALF:
+		var gy: float = Game.field.ground_y(p)
+		if p.y < gy - 0.03:
+			var t := state.transform
+			t.origin.y = gy + 0.03
+			state.transform = t
+			var v := state.linear_velocity
+			if v.y < 0.0:
+				v.y = -v.y * 0.2
+				v.x *= 0.7
+				v.z *= 0.7
+				state.linear_velocity = v
 	var n := state.get_contact_count()
 	for i in n:
 		var nrm := state.get_contact_local_normal(i)

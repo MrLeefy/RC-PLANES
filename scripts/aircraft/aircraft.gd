@@ -177,7 +177,10 @@ func setup(definition: Dictionary, config: Dictionary, detail_level := 2, for_di
 	# physics body config
 	collision_layer = Game.L_AIRCRAFT
 	collision_mask = Game.L_WORLD | Game.L_NPC | Game.L_DEBRIS | Game.L_GATE
-	continuous_cd = true
+	# Jolt's LinearCast CCD teleports bodies with our hull/box colliders (observed: the airframe or debris
+	# jumping 10^4..10^5 m after an impact, half of all steep crashes). Tunnelling is prevented instead by
+	# the explicit swept probes in _sweep_probes() plus the length of the airframe along its own motion.
+	continuous_cd = false
 	can_sleep = false
 	contact_monitor = true
 	max_contacts_reported = 16
@@ -193,6 +196,7 @@ func setup(definition: Dictionary, config: Dictionary, detail_level := 2, for_di
 	physics_material_override = pm
 	recompute_mass()
 	has_htail = not (def["htail"] as Dictionary).is_empty()
+	_build_probes()
 	compute_factory_trim()
 	gear_down = true
 	gear_pos = 1.0
@@ -519,6 +523,7 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		terrain_agl = maxf(0.0, com_w.y - Game.field.ground_y(com_w))
 	else:
 		terrain_agl = 0.0
+	_sweep_probes(state, space, xf, v_w, dt)
 	# ---- control mixing & servos ----
 	_mix_controls(dt, B, w_l, air_l)
 	var F := Vector3.ZERO
@@ -1066,6 +1071,92 @@ func SURF_FROM(collider, p: Vector3) -> int:
 		return int((collider as Object).get_meta("surface"))
 	return Game.surface_at(p)
 
+
+# ================================================================ swept collision probes
+## With Jolt CCD off, a fast aircraft could in theory step over a thin obstacle with just its wing tip.
+## Above ~35 m/s (more than ~0.28 m per 120 Hz step) we cast rays from the nose, wing tips and tail along
+## the step; a probe that would cross a solid inside the step is stopped on the surface and takes the
+## impact (so it hurts exactly like a real contact would), and the normal velocity is removed.
+var _probes: Array = []
+
+func _comp_by_id(cid: String) -> int:
+	for i in comps.size():
+		if String(comps[i]["id"]) == cid:
+			return i
+	return -1
+
+func _build_probes() -> void:
+	_probes.clear()
+	var fus: Array = def["fuselage"]
+	var nose_c := _comp_by_id("nose")
+	_probes.append([Vector3(0, float(fus[0][3]), 0.0), nose_c if nose_c >= 0 else 0])
+	_probes.append([Vector3(0, float(fus[fus.size() - 1][3]), length_m), maxi(_comp_by_id("tail_boom"), 0)])
+	for wi in (def["wings"] as Array).size():
+		var w: Dictionary = def["wings"][wi]
+		var half := float(w["span"]) * 0.5
+		var tz := float(w["z"]) + tan(deg_to_rad(float(w["sweep"]))) * half
+		var ty := float(w["y"]) + sin(deg_to_rad(float(w["dihedral"]))) * half
+		for sd in ["L", "R"]:
+			var ci := _comp_by_id("tip%d_%s" % [wi, sd])
+			if ci < 0:
+				ci = _comp_by_id("wing%d_%s" % [wi, sd])
+			_probes.append([Vector3((-1.0 if sd == "L" else 1.0) * half, ty, tz), maxi(ci, 0)])
+
+func _sweep_probes(state: PhysicsDirectBodyState3D, space: PhysicsDirectSpaceState3D, xf: Transform3D, v_w: Vector3, dt: float) -> void:
+	var move := v_w * dt
+	var ml := move.length()
+	if ml < 0.28 or contact_grace > 0:
+		return
+	var dir := move / ml
+	var best := ml
+	var hit_n := Vector3.UP
+	var hit_p := Vector3.ZERO
+	var hit_ci := -1
+	var hit_col: Object = null
+	for pr in _probes:
+		var ci := int(pr[1])
+		if comps[ci]["detached"]:
+			continue
+		var p0 := xf * (pr[0] as Vector3)
+		_ray_params.from = p0
+		_ray_params.to = p0 + move * 1.03
+		var hit := space.intersect_ray(_ray_params)
+		if hit.is_empty():
+			continue
+		var d := p0.distance_to(hit["position"])
+		if d < best and -v_w.dot(hit["normal"]) > 3.0:
+			best = d
+			hit_n = hit["normal"]
+			hit_p = hit["position"]
+			hit_ci = ci
+			hit_col = hit.get("collider")
+	if hit_ci < 0 or best >= ml:
+		return
+	var closing := -v_w.dot(hit_n)
+	var hard := 1.0
+	var kind := "ground"
+	if hit_col:
+		hard = float(hit_col.get_meta("hardness", 1.0))
+		kind = String(hit_col.get_meta("kind", "ground"))
+		if hit_col.has_method("hit_by_aircraft"):
+			hit_col.hit_by_aircraft(self, v_w.length(), -hit_n, hit_p)
+		if hit_col.has_method("knock"):
+			hit_col.knock(-hit_n * closing * mass, hit_p)
+	# stop the probe on the surface (pull the body back by the overshoot) and remove the normal velocity
+	var t := state.transform
+	t.origin += dir * (best - ml)
+	state.transform = t
+	state.linear_velocity = v_w - hit_n * v_w.dot(hit_n) * 1.05
+	var sev := closing * hard
+	impact_log.append({"t": sim_t, "comp": comps[hit_ci]["id"], "sev": sev, "kind": kind + "_swept"})
+	if impact_log.size() > 40:
+		impact_log.pop_front()
+	last_contact_speed = closing
+	max_impact = maxf(max_impact, sev)
+	_damage(hit_ci, sev, hit_p, hit_n, kind)
+	if sev > 25.0 and damage_mode == "physical":
+		_inertial_shock(sev * 6.0, hit_p)
+
 # ================================================================ contacts & damage
 var contact_grace := 0
 
@@ -1333,7 +1424,7 @@ func detach(ci: int, info := {}) -> void:
 		rb.sleeping = false
 		rb.linear_velocity = linear_velocity + angular_velocity.cross(p_w - com_w)
 		rb.angular_velocity = angular_velocity + Vector3(Game.rng.randf_range(-3, 3), Game.rng.randf_range(-3, 3), Game.rng.randf_range(-3, 3))
-		rb.continuous_cd = linear_velocity.length() > 15.0
+		rb.continuous_cd = false
 		rb.call("ignore_temporarily", self, 0.35, true)
 		if rb.has_method("activate"):
 			rb.activate()
