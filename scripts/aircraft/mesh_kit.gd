@@ -126,8 +126,11 @@ func _emit_grid(list: PackedInt32Array, base: int, cc: int, rsel: Array, csel: A
 ## (a stripe or camo edge crosses the triangle) the triangle is split into a small
 ## barycentric lattice and re-painted, so the edge resolves crisply instead of smearing or
 ## stair-stepping. Sub-vertices lie exactly on the parent triangle, so no cracks appear.
+const REFINE_DEPTH := 1   # 2 = second refinement level (costs ~2x triangles, not worth it on mobile)
 const REFINE_K := 4
+const REFINE_K2 := 3
 const REFINE_THRESHOLD := 0.06
+const REFINE_THRESHOLD2 := 0.30
 
 func _col_dist(a: Color, b: Color) -> float:
 	return absf(a.r - b.r) + absf(a.g - b.g) + absf(a.b - b.b) + absf(a.a - b.a) * 0.5
@@ -136,13 +139,20 @@ func _tri_refined(list: PackedInt32Array, a: int, b: int, c: int, refine_fn: Cal
 	if not refine_fn.is_valid():
 		_tri(list, a, b, c)
 		return
+	_refine(list, a, b, c, refine_fn, REFINE_DEPTH)
+
+## Paint-edge refinement: a triangle whose corner paint differs is split into a barycentric lattice
+## (K=4) whose new vertices take anti-aliased paint, so stripe/camo edges are soft straight lines
+## instead of stair steps. REFINE_DEPTH 2 would split edge sub-triangles again (K=3).
+func _refine(list: PackedInt32Array, a: int, b: int, c: int, refine_fn: Callable, depth: int) -> void:
 	var ca := cols[a]
 	var cb := cols[b]
 	var cc2 := cols[c]
-	if maxf(_col_dist(ca, cb), maxf(_col_dist(cb, cc2), _col_dist(ca, cc2))) < REFINE_THRESHOLD:
+	var thr := REFINE_THRESHOLD if depth >= REFINE_DEPTH else REFINE_THRESHOLD2
+	if depth <= 0 or maxf(_col_dist(ca, cb), maxf(_col_dist(cb, cc2), _col_dist(ca, cc2))) < thr:
 		_tri(list, a, b, c)
 		return
-	var k := REFINE_K
+	var k := REFINE_K if depth >= REFINE_DEPTH else REFINE_K2
 	var grid := {}
 	for i in range(k + 1):
 		for j in range(k + 1 - i):
@@ -159,12 +169,14 @@ func _tri_refined(list: PackedInt32Array, a: int, b: int, c: int, refine_fn: Cal
 				var pos := verts[a] * w0 + verts[b] * w1 + verts[c] * w2
 				var nrm := (norms[a] * w0 + norms[b] * w1 + norms[c] * w2).normalized()
 				var uv := uvs[a] * w0 + uvs[b] * w1 + uvs[c] * w2
-				grid[Vector2i(i, j)] = _add_v(pos, nrm, refine_fn.call(pos, nrm), uv)
+				# refinement vertices use the anti-aliased paint when the colour function offers one
+				var pc: Color = refine_fn.call(pos, nrm, true) if refine_fn.get_argument_count() >= 3 else refine_fn.call(pos, nrm)
+				grid[Vector2i(i, j)] = _add_v(pos, nrm, pc, uv)
 	for i in range(k):
 		for j in range(k - i):
-			_tri(list, grid[Vector2i(i, j)], grid[Vector2i(i + 1, j)], grid[Vector2i(i, j + 1)])
+			_refine(list, grid[Vector2i(i, j)], grid[Vector2i(i + 1, j)], grid[Vector2i(i, j + 1)], refine_fn, depth - 1)
 			if i + j < k - 1:
-				_tri(list, grid[Vector2i(i + 1, j)], grid[Vector2i(i + 1, j + 1)], grid[Vector2i(i, j + 1)])
+				_refine(list, grid[Vector2i(i + 1, j)], grid[Vector2i(i + 1, j + 1)], grid[Vector2i(i, j + 1)], refine_fn, depth - 1)
 
 ## Flat polygon fan cap. ring ordered; normal given explicitly (outward).
 func add_cap(center: Vector3, ring: PackedVector3Array, n: Vector3, color_fn: Callable, detail := false) -> void:

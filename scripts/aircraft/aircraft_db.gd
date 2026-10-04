@@ -64,7 +64,7 @@ static func _elec(pos: Vector3, kv: float, rm: float, i0: float, mass: float, o:
 static func _ic(kind: String, pos: Vector3, qmax: float, rpm_peak: float, rpm_max: float, mass: float, o: Dictionary = {}) -> Dictionary:
 	# kind: glow2, glow4, gas2
 	var e := {"type": kind, "pos": pos, "dir": Vector3(0, 0, -1), "qmax": qmax, "rpm_peak": rpm_peak,
-		"rpm_max": rpm_max, "mass": mass, "spin": 1, "idle": 0.2, "nacelle": {}, "spinner_r": 0.035,
+		"rpm_max": rpm_max, "mass": mass, "spin": 1, "idle": 0.1, "nacelle": {}, "spinner_r": 0.035,
 		"spinner_len": 0.07, "bsfc": 1.0}
 	e.merge(o, true)
 	return e
@@ -97,7 +97,7 @@ static func _base(o: Dictionary) -> Dictionary:
 		"cg": 0.28, "rates": {"ail": 22.0, "elev": 20.0, "rud": 25.0, "flap": 35.0},
 		"servo_speed": 420.0, "strength": 1.0, "livery": {}, "labels": [],
 		"batteries": [], "props": [], "tank": 0.0, "fuel_type": "", "gear_drag": 0.012,
-		"body_cd": 0.12, "sound": "", "wheelbase_brake": 3.0, "details": {},
+		"body_cd": 0.12, "sound": "", "wheelbase_brake": 3.0, "details": {}, "trim_cl": 0.36,
 	}
 	d.merge(o, true)
 	return d
@@ -119,7 +119,7 @@ static func _build() -> Array:
 			"camber": 0.035, "ail": [0.46, 0.94, 0.24], "flap": [0.07, 0.42, 0.25], "struts": true, "stall_deg": 14.5})],
 		"htail": _htail(0.975, 0.045, 0.52, 0.15, 0.11, {"elev_cf": 0.42}),
 		"vtails": [_vtail(0.935, 0.07, 0.19, 0.20, 0.10, {"sweep": 32.0, "rudder_cf": 0.45})],
-		"engines": [_elec(Vector3(0, 0.0, 0.065), 680.0, 0.032, 1.3, 0.17, {"spinner_r": 0.028, "spinner_len": 0.055})],
+		"engines": [_elec(Vector3(0, 0.0, 0.065), 520.0, 0.040, 1.0, 0.17, {"spinner_r": 0.028, "spinner_len": 0.055})],
 		"gear": {"type": "tricycle", "retract": false, "wheels": [
 			_wheel(0, -0.035, 0.12, 0.034, {"len": 0.12, "steer": true, "style": "wire", "brake": false}),
 			_wheel(-0.15, -0.05, 0.37, 0.04, {"len": 0.11, "style": "spring", "pants": true}),
@@ -145,17 +145,17 @@ static func _build() -> Array:
 			"camber": 0.04, "ail": [0.5, 0.96, 0.24], "flap": [0.08, 0.46, 0.26], "struts": true, "tip_style": "square", "stall_deg": 15.0})],
 		"htail": _htail(0.79, 0.05, 0.44, 0.13, 0.10, {"elev_cf": 0.45, "sweep": 4.0}),
 		"vtails": [_vtail(0.76, 0.07, 0.17, 0.16, 0.10, {"sweep": 18.0, "rudder_cf": 0.5})],
-		"engines": [_elec(Vector3(0, 0.005, 0.055), 900.0, 0.036, 1.1, 0.14, {"spinner_r": 0.024, "spinner_len": 0.045})],
+		"engines": [_elec(Vector3(0, 0.005, 0.055), 780.0, 0.045, 0.9, 0.14, {"spinner_r": 0.024, "spinner_len": 0.045})],
 		"gear": {"type": "taildragger", "retract": false, "wheels": [
 			_wheel(-0.13, -0.10, 0.17, 0.065, {"len": 0.08, "style": "bush", "w": 0.05}),
 			_wheel(0.13, -0.10, 0.17, 0.065, {"len": 0.08, "style": "bush", "w": 0.05}),
 			_wheel(0, 0.005, 0.87, 0.018, {"len": 0.04, "steer": true, "style": "tail", "tail": true, "brake": false})]},
-		"cg": 0.28, "rates": {"ail": 22.0, "elev": 22.0, "rud": 30.0, "flap": 40.0},
+		"cg": 0.34, "rates": {"ail": 22.0, "elev": 22.0, "rud": 30.0, "flap": 40.0},
 		"livery": {"scheme": "cub", "base": Color(0.98, 0.80, 0.08), "a1": Color(0.06, 0.06, 0.07), "a2": Color(0.85, 0.85, 0.85)},
 		"labels": [{"text": "TUNDRA CUB", "z": 0.45, "y": 0.005, "size": 0.03, "color": Color(0.05, 0.05, 0.05)}],
 		"batteries": [_batt("3S 2200 mAh", 3, 2.2, 0.19), _batt("4S 2200 mAh", 4, 2.2, 0.25)],
 		"props": [_prop("11 x 5.5", 11, 5.5), _prop("10 x 6", 10, 6)],
-		"body_cd": 0.28, "gear_drag": 0.03,
+		"body_cd": 0.28, "gear_drag": 0.03, "trim_cl": 0.6,
 	}))
 
 	# 3 ── STOL: Ridgeline STOL (foam, slats + big flaps)
@@ -172,17 +172,17 @@ static func _build() -> Array:
 			"tip_style": "square", "stall_deg": 16.0})],
 		"htail": _htail(0.93, 0.055, 0.55, 0.15, 0.12, {"elev_cf": 0.45}),
 		"vtails": [_vtail(0.89, 0.075, 0.20, 0.19, 0.11, {"sweep": 22.0, "rudder_cf": 0.5})],
-		"engines": [_elec(Vector3(0, 0.004, 0.06), 850.0, 0.030, 1.3, 0.18, {"spinner_r": 0.028, "spinner_len": 0.055})],
+		"engines": [_elec(Vector3(0, 0.004, 0.06), 560.0, 0.040, 1.0, 0.18, {"spinner_r": 0.028, "spinner_len": 0.055})],
 		"gear": {"type": "taildragger", "retract": false, "wheels": [
 			_wheel(-0.15, -0.115, 0.20, 0.07, {"len": 0.09, "style": "bush", "w": 0.055, "k_scale": 0.9}),
 			_wheel(0.15, -0.115, 0.20, 0.07, {"len": 0.09, "style": "bush", "w": 0.055, "k_scale": 0.9}),
 			_wheel(0, 0.005, 1.03, 0.02, {"len": 0.045, "steer": true, "style": "tail", "tail": true, "brake": false})]},
-		"cg": 0.27, "rates": {"ail": 22.0, "elev": 24.0, "rud": 30.0, "flap": 45.0},
+		"cg": 0.30, "rates": {"ail": 22.0, "elev": 24.0, "rud": 30.0, "flap": 45.0},
 		"livery": {"scheme": "stol", "base": Color(0.96, 0.96, 0.95), "a1": Color(1.0, 0.45, 0.05), "a2": Color(0.20, 0.22, 0.24)},
 		"labels": [{"text": "RIDGELINE", "z": 0.52, "y": 0.01, "size": 0.034, "color": Color(0.2, 0.2, 0.22)}],
 		"batteries": [_batt("4S 3000 mAh", 4, 3.0, 0.33), _batt("4S 3300 mAh", 4, 3.3, 0.36)],
 		"props": [_prop("12 x 6", 12, 6, 3), _prop("11 x 7", 11, 7, 3)],
-		"body_cd": 0.25, "gear_drag": 0.03,
+		"body_cd": 0.25, "gear_drag": 0.03, "trim_cl": 0.6,
 	}))
 
 	# 4 ── 3D aerobat: Vortex 540 (balsa/composite, 35cc gas)
@@ -198,7 +198,7 @@ static func _build() -> Array:
 			"camber": 0.0, "ail": [0.10, 0.97, 0.30], "tip_style": "square", "stall_deg": 15.0, "sweep": 5.0})],
 		"htail": _htail(1.52, 0.045, 0.74, 0.26, 0.17, {"elev_cf": 0.48, "thick": 0.07}),
 		"vtails": [_vtail(1.45, 0.08, 0.36, 0.34, 0.20, {"sweep": 22.0, "rudder_cf": 0.62})],
-		"engines": [_ic("gas2", Vector3(0, 0.0, 0.075), 3.9, 7200.0, 8400.0, 1.1, {"spinner_r": 0.045, "spinner_len": 0.085})],
+		"engines": [_ic("gas2", Vector3(0, 0.0, 0.075), 3.4, 7200.0, 8400.0, 1.1, {"spinner_r": 0.045, "spinner_len": 0.085})],
 		"gear": {"type": "taildragger", "retract": false, "wheels": [
 			_wheel(-0.19, -0.19, 0.36, 0.055, {"len": 0.14, "style": "spring", "pants": true, "w": 0.03}),
 			_wheel(0.19, -0.19, 0.36, 0.055, {"len": 0.14, "style": "spring", "pants": true, "w": 0.03}),
@@ -223,7 +223,7 @@ static func _build() -> Array:
 			"camber": 0.0, "ail": [0.12, 0.96, 0.26], "tip_style": "square", "sweep": 4.0})],
 		"htail": _htail(1.23, 0.035, 0.60, 0.20, 0.13, {"elev_cf": 0.42}),
 		"vtails": [_vtail(1.17, 0.06, 0.28, 0.26, 0.15, {"sweep": 24.0, "rudder_cf": 0.5})],
-		"engines": [_ic("glow2", Vector3(0, 0.0, 0.065), 1.45, 11500.0, 13500.0, 0.62, {"spinner_r": 0.037, "spinner_len": 0.07})],
+		"engines": [_ic("glow2", Vector3(0, 0.0, 0.065), 1.30, 11500.0, 13500.0, 0.62, {"spinner_r": 0.037, "spinner_len": 0.07})],
 		"gear": {"type": "taildragger", "retract": false, "wheels": [
 			_wheel(-0.16, -0.16, 0.30, 0.042, {"len": 0.12, "style": "spring", "pants": true}),
 			_wheel(0.16, -0.16, 0.30, 0.042, {"len": 0.12, "style": "spring", "pants": true}),
@@ -251,7 +251,7 @@ static func _build() -> Array:
 				"camber": 0.0, "ail": [0.18, 0.96, 0.27], "tip_style": "round", "sweep": 0.0})],
 		"htail": _htail(0.90, 0.03, 0.44, 0.15, 0.10, {"elev_cf": 0.45}),
 		"vtails": [_vtail(0.86, 0.05, 0.19, 0.20, 0.12, {"sweep": 30.0, "rudder_cf": 0.55})],
-		"engines": [_ic("glow4", Vector3(0, 0.0, 0.06), 1.55, 9500.0, 11200.0, 0.64, {"spinner_r": 0.034, "spinner_len": 0.06})],
+		"engines": [_ic("glow4", Vector3(0, 0.0, 0.06), 1.05, 9500.0, 11200.0, 0.58, {"spinner_r": 0.034, "spinner_len": 0.06})],
 		"gear": {"type": "taildragger", "retract": false, "wheels": [
 			_wheel(-0.13, -0.155, 0.18, 0.042, {"len": 0.12, "style": "strut", "pants": true}),
 			_wheel(0.13, -0.155, 0.18, 0.042, {"len": 0.12, "style": "strut", "pants": true}),
@@ -276,7 +276,7 @@ static func _build() -> Array:
 			"camber": 0.02, "ail": [0.55, 0.93, 0.22], "flap": [0.07, 0.52, 0.2], "tip_style": "square", "sweep": 2.0, "stall_deg": 14.0})],
 		"htail": _htail(1.21, 0.045, 0.52, 0.18, 0.10, {"elev_cf": 0.38}),
 		"vtails": [_vtail(1.14, 0.06, 0.22, 0.26, 0.10, {"sweep": 25.0, "rudder_cf": 0.4})],
-		"engines": [_ic("glow4", Vector3(0, 0.012, 0.08), 2.9, 8200.0, 9800.0, 1.0, {"spinner_r": 0.05, "spinner_len": 0.10})],
+		"engines": [_ic("glow4", Vector3(0, 0.012, 0.08), 2.0, 8200.0, 9800.0, 1.0, {"spinner_r": 0.05, "spinner_len": 0.10})],
 		"gear": {"type": "taildragger", "retract": true, "wheels": [
 			_wheel(-0.17, -0.19, 0.38, 0.05, {"len": 0.13, "style": "oleo", "w": 0.024}),
 			_wheel(0.17, -0.19, 0.38, 0.05, {"len": 0.13, "style": "oleo", "w": 0.024}),
@@ -299,16 +299,16 @@ static func _build() -> Array:
 			[0.48, 0.066, 0.095, 0.022, 2.8], [0.72, 0.05, 0.07, 0.03, 2.5], [0.98, 0.034, 0.05, 0.04, 2.3],
 			[1.22, 0.018, 0.032, 0.046, 2.1], [1.29, 0.008, 0.02, 0.048, 2.0]],
 		"canopy": {"z0": 0.36, "z1": 0.64, "hw": 0.052, "hh": 0.055, "y": 0.09, "style": "bubble", "tint": Color(0.1, 0.13, 0.16)},
-		"wings": [_wing(0.30, -0.045, 1.55, 0.30, 0.22, {"dihedral": 3.5, "incidence": 1.0, "washout": 1.0, "thick": 0.14,
+		"wings": [_wing(0.30, -0.045, 1.55, 0.30, 0.22, {"dihedral": 3.5, "incidence": 1.0, "washout": 2.5, "thick": 0.14,
 			"camber": 0.02, "ail": [0.45, 0.94, 0.24], "flap": [0.06, 0.42, 0.24], "tip_style": "round"})],
 		"htail": _htail(1.07, 0.035, 0.56, 0.16, 0.11, {"elev_cf": 0.42}),
 		"vtails": [_vtail(1.03, 0.05, 0.21, 0.22, 0.11, {"sweep": 30.0, "rudder_cf": 0.45})],
-		"engines": [_ic("glow2", Vector3(0, 0.0, 0.06), 0.72, 12500.0, 15000.0, 0.40, {"spinner_r": 0.03, "spinner_len": 0.06})],
+		"engines": [_ic("glow2", Vector3(0, 0.0, 0.06), 0.80, 11000.0, 13000.0, 0.40, {"spinner_r": 0.03, "spinner_len": 0.06})],
 		"gear": {"type": "tricycle", "retract": false, "wheels": [
 			_wheel(0, -0.095, 0.13, 0.035, {"len": 0.13, "steer": true, "style": "wire", "brake": false}),
 			_wheel(-0.17, -0.10, 0.42, 0.04, {"len": 0.10, "style": "wire", "pants": false}),
 			_wheel(0.17, -0.10, 0.42, 0.04, {"len": 0.10, "style": "wire", "pants": false})]},
-		"cg": 0.28, "rates": {"ail": 20.0, "elev": 18.0, "rud": 25.0, "flap": 30.0},
+		"cg": 0.30, "rates": {"ail": 20.0, "elev": 18.0, "rud": 25.0, "flap": 30.0},
 		"livery": {"scheme": "valor", "base": Color(0.98, 0.98, 0.98), "a1": Color(0.05, 0.55, 0.30), "a2": Color(0.98, 0.72, 0.05)},
 		"labels": [{"text": "VALOR 46", "z": 0.80, "y": 0.02, "size": 0.04, "color": Color(0.05, 0.45, 0.25)}],
 		"props": [_prop("11 x 6", 11, 6), _prop("12 x 6", 12, 6)],
@@ -328,12 +328,12 @@ static func _build() -> Array:
 			"camber": 0.02, "ail": [0.52, 0.92, 0.22], "flap": [0.07, 0.48, 0.22], "tip_style": "square"})],
 		"htail": _htail(1.00, 0.045, 0.52, 0.17, 0.10, {"elev_cf": 0.4}),
 		"vtails": [_vtail(0.96, 0.06, 0.24, 0.24, 0.10, {"sweep": 12.0, "rudder_cf": 0.42})],
-		"engines": [_elec(Vector3(0, 0.0, 0.07), 520.0, 0.022, 1.6, 0.30, {"spinner_r": 0.035, "spinner_len": 0.07, "radial": true})],
+		"engines": [_elec(Vector3(0, 0.0, 0.07), 350.0, 0.032, 1.3, 0.30, {"spinner_r": 0.035, "spinner_len": 0.07, "radial": true})],
 		"gear": {"type": "tricycle", "retract": true, "wheels": [
 			_wheel(0, -0.145, 0.20, 0.038, {"len": 0.12, "steer": true, "style": "oleo", "brake": false}),
 			_wheel(-0.19, -0.13, 0.42, 0.045, {"len": 0.12, "style": "oleo"}),
 			_wheel(0.19, -0.13, 0.42, 0.045, {"len": 0.12, "style": "oleo"})]},
-		"cg": 0.27, "rates": {"ail": 18.0, "elev": 18.0, "rud": 22.0, "flap": 35.0},
+		"cg": 0.29, "rates": {"ail": 18.0, "elev": 18.0, "rud": 22.0, "flap": 35.0},
 		"livery": {"scheme": "t28", "base": Color(0.10, 0.20, 0.45), "a1": Color(0.98, 0.78, 0.10), "a2": Color(0.95, 0.95, 0.95)},
 		"labels": [{"text": "TIGER 28", "z": 0.80, "y": 0.02, "size": 0.04, "color": Color(0.98, 0.78, 0.1)}],
 		"batteries": [_batt("6S 4000 mAh", 6, 4.0, 0.62), _batt("6S 5000 mAh", 6, 5.0, 0.76), _batt("5S 4000 mAh", 5, 4.0, 0.52)],
@@ -354,7 +354,7 @@ static func _build() -> Array:
 			"camber": 0.01, "ail": [0.50, 0.92, 0.25], "flap": [0.10, 0.48, 0.25], "sweep": 30.0, "tip_style": "square", "stall_deg": 16.0})],
 		"htail": _htail(1.13, 0.03, 0.46, 0.18, 0.07, {"sweep": 35.0, "elev_cf": 0.4}),
 		"vtails": [_vtail(1.02, 0.07, 0.24, 0.30, 0.09, {"sweep": 45.0, "rudder_cf": 0.35})],
-		"engines": [_edf(Vector3(0, 0.005, 0.95), 90.0, 38.0, 72.0, 95.0, 0.55, {"intake": "sides", "intake_z": 0.46})],
+		"engines": [_edf(Vector3(0, 0.005, 0.95), 90.0, 29.0, 66.0, 78.0, 0.55, {"intake": "sides", "intake_z": 0.46})],
 		"gear": {"type": "tricycle", "retract": true, "wheels": [
 			_wheel(0, -0.12, 0.30, 0.03, {"len": 0.12, "steer": true, "style": "oleo", "brake": false}),
 			_wheel(-0.14, -0.10, 0.80, 0.035, {"len": 0.10, "style": "oleo"}),
@@ -380,7 +380,7 @@ static func _build() -> Array:
 			"camber": 0.0, "ail": [0.20, 0.62, 0.25], "flap": [], "sweep": 40.0, "tip_style": "rail", "stall_deg": 22.0})],
 		"htail": _htail(1.95, -0.01, 0.95, 0.40, 0.14, {"sweep": 40.0, "stabilator": true, "taileron": 0.5, "dihedral": -10.0, "thick": 0.05}),
 		"vtails": [_vtail(1.70, 0.10, 0.52, 0.55, 0.18, {"sweep": 47.0, "rudder_cf": 0.3})],
-		"engines": [_turbine(Vector3(0, 0.0, 2.2), 100.0, 1.1, {"intake": "belly", "intake_z": 0.75, "fan_d": 0.13})],
+		"engines": [_turbine(Vector3(0, 0.0, 2.2), 120.0, 1.1, {"intake": "belly", "intake_z": 0.75, "fan_d": 0.13})],
 		"gear": {"type": "tricycle", "retract": true, "wheels": [
 			_wheel(0, -0.22, 0.62, 0.045, {"len": 0.16, "steer": true, "style": "oleo", "brake": false}),
 			_wheel(-0.19, -0.2, 1.42, 0.06, {"len": 0.14, "style": "oleo"}),
@@ -404,8 +404,8 @@ static func _build() -> Array:
 			"camber": 0.0, "ail": [0.35, 0.92, 0.22], "flap": [0.12, 0.35, 0.22], "sweep": 42.0, "tip_style": "square", "x0": 0.12, "stall_deg": 24.0})],
 		"htail": _htail(1.03, 0.0, 0.62, 0.22, 0.08, {"sweep": 42.0, "stabilator": true, "taileron": 0.4, "thick": 0.05}),
 		"vtails": [_vtail(0.88, 0.045, 0.19, 0.22, 0.08, {"x": 0.11, "sweep": 42.0, "rudder_cf": 0.3, "cant": 28.0, "mirror": true})],
-		"engines": [_edf(Vector3(-0.055, 0.0, 1.15), 70.0, 18.0, 62.0, 60.0, 0.30, {"intake": "sides_single", "intake_z": 0.34}),
-			_edf(Vector3(0.055, 0.0, 1.15), 70.0, 18.0, 62.0, 60.0, 0.30, {"intake": "sides_single", "intake_z": 0.34, "spin": -1})],
+		"engines": [_edf(Vector3(-0.055, 0.0, 1.15), 70.0, 15.0, 58.0, 50.0, 0.30, {"intake": "sides_single", "intake_z": 0.34}),
+			_edf(Vector3(0.055, 0.0, 1.15), 70.0, 15.0, 58.0, 50.0, 0.30, {"intake": "sides_single", "intake_z": 0.34, "spin": -1})],
 		"gear": {"type": "tricycle", "retract": true, "wheels": [
 			_wheel(0, -0.12, 0.25, 0.028, {"len": 0.10, "steer": true, "style": "oleo", "brake": false}),
 			_wheel(-0.12, -0.11, 0.72, 0.032, {"len": 0.10, "style": "oleo"}),
@@ -430,8 +430,8 @@ static func _build() -> Array:
 			"camber": 0.03, "ail": [0.62, 0.95, 0.25], "flap": [0.10, 0.58, 0.25], "tip_style": "droop", "stall_deg": 15.0})],
 		"htail": _htail(1.12, 0.05, 0.56, 0.17, 0.17, {"elev_cf": 0.42, "sweep": 0.0}),
 		"vtails": [_vtail(1.10, 0.05, 0.20, 0.19, 0.13, {"x": 0.28, "sweep": 8.0, "rudder_cf": 0.4, "mirror": true})],
-		"engines": [_edf(Vector3(-0.11, 0.15, 0.86), 70.0, 16.0, 45.0, 55.0, 0.30, {"intake": "pod", "nacelle": {"len": 0.30, "r": 0.055}}),
-			_edf(Vector3(0.11, 0.15, 0.86), 70.0, 16.0, 45.0, 55.0, 0.30, {"intake": "pod", "nacelle": {"len": 0.30, "r": 0.055}, "spin": -1})],
+		"engines": [_edf(Vector3(-0.11, 0.15, 0.86), 70.0, 15.0, 45.0, 48.0, 0.30, {"intake": "pod", "nacelle": {"len": 0.30, "r": 0.055}}),
+			_edf(Vector3(0.11, 0.15, 0.86), 70.0, 15.0, 45.0, 48.0, 0.30, {"intake": "pod", "nacelle": {"len": 0.30, "r": 0.055}, "spin": -1})],
 		"gear": {"type": "tricycle", "retract": false, "wheels": [
 			_wheel(0.03, -0.13, 0.20, 0.032, {"len": 0.10, "steer": true, "style": "oleo", "brake": false}),
 			_wheel(-0.30, -0.14, 0.55, 0.038, {"len": 0.08, "style": "oleo"}),
@@ -453,15 +453,15 @@ static func _build() -> Array:
 			[0.45, 0.12, 0.13, 0.0, 3.0], [0.95, 0.12, 0.13, 0.0, 3.0], [1.15, 0.10, 0.11, 0.035, 2.7],
 			[1.38, 0.06, 0.07, 0.08, 2.3], [1.56, 0.022, 0.03, 0.11, 2.0], [1.60, 0.012, 0.018, 0.11, 2.0]],
 		"canopy": {"z0": 0.05, "z1": 0.16, "hw": 0.085, "hh": 0.05, "y": 0.06, "style": "cockpit", "tint": Color(0.08, 0.1, 0.12)},
-		"wings": [_wing(0.52, 0.125, 2.05, 0.30, 0.17, {"dihedral": 1.5, "incidence": 2.0, "washout": 1.5, "thick": 0.15,
+		"wings": [_wing(0.52, 0.125, 2.05, 0.30, 0.17, {"dihedral": 1.5, "incidence": 2.0, "washout": 3.0, "thick": 0.15,
 			"camber": 0.035, "ail": [0.60, 0.95, 0.22], "flap": [0.07, 0.58, 0.25], "tip_style": "round", "stall_deg": 14.5})],
 		"htail": _htail(1.40, 0.10, 0.80, 0.22, 0.13, {"elev_cf": 0.38, "sweep": 6.0}),
 		"vtails": [_vtail(1.32, 0.13, 0.36, 0.33, 0.16, {"sweep": 20.0, "rudder_cf": 0.38})],
 		"engines": [
-			_elec(Vector3(-0.60, 0.11, 0.44), 780.0, 0.045, 0.9, 0.12, {"spinner_r": 0.025, "spinner_len": 0.05, "nacelle": {"len": 0.28, "r": 0.04}}),
-			_elec(Vector3(-0.33, 0.11, 0.42), 780.0, 0.045, 0.9, 0.12, {"spinner_r": 0.025, "spinner_len": 0.05, "nacelle": {"len": 0.30, "r": 0.04}}),
-			_elec(Vector3(0.33, 0.11, 0.42), 780.0, 0.045, 0.9, 0.12, {"spinner_r": 0.025, "spinner_len": 0.05, "nacelle": {"len": 0.30, "r": 0.04}}),
-			_elec(Vector3(0.60, 0.11, 0.44), 780.0, 0.045, 0.9, 0.12, {"spinner_r": 0.025, "spinner_len": 0.05, "nacelle": {"len": 0.28, "r": 0.04}})],
+			_elec(Vector3(-0.60, 0.11, 0.44), 650.0, 0.045, 0.8, 0.12, {"spinner_r": 0.025, "spinner_len": 0.05, "nacelle": {"len": 0.28, "r": 0.04}}),
+			_elec(Vector3(-0.33, 0.11, 0.42), 650.0, 0.045, 0.8, 0.12, {"spinner_r": 0.025, "spinner_len": 0.05, "nacelle": {"len": 0.30, "r": 0.04}}),
+			_elec(Vector3(0.33, 0.11, 0.42), 650.0, 0.045, 0.8, 0.12, {"spinner_r": 0.025, "spinner_len": 0.05, "nacelle": {"len": 0.30, "r": 0.04}}),
+			_elec(Vector3(0.60, 0.11, 0.44), 650.0, 0.045, 0.8, 0.12, {"spinner_r": 0.025, "spinner_len": 0.05, "nacelle": {"len": 0.28, "r": 0.04}})],
 		"gear": {"type": "tricycle", "retract": false, "wheels": [
 			_wheel(0, -0.15, 0.20, 0.035, {"len": 0.06, "steer": true, "style": "oleo", "brake": false}),
 			_wheel(-0.13, -0.15, 0.72, 0.045, {"len": 0.06, "style": "pod"}),
@@ -484,7 +484,7 @@ static func _build() -> Array:
 			[0.40, 0.105, 0.14, 0.02, 2.0], [0.62, 0.105, 0.12, 0.0, 2.0], [1.30, 0.105, 0.11, 0.0, 2.0],
 			[1.58, 0.075, 0.08, 0.02, 2.0], [1.80, 0.035, 0.045, 0.04, 2.0], [1.90, 0.012, 0.02, 0.045, 2.0]],
 		"canopy": {"z0": 0.09, "z1": 0.16, "hw": 0.06, "hh": 0.03, "y": 0.105, "style": "cockpit", "tint": Color(0.05, 0.06, 0.08)},
-		"wings": [_wing(0.72, -0.07, 1.95, 0.52, 0.12, {"dihedral": 6.0, "incidence": 2.0, "washout": 2.0, "thick": 0.11,
+		"wings": [_wing(0.50, -0.07, 1.95, 0.52, 0.12, {"dihedral": 6.0, "incidence": 2.0, "washout": 2.0, "thick": 0.11,
 			"camber": 0.025, "ail": [0.62, 0.92, 0.22], "flap": [0.08, 0.58, 0.24], "sweep": 37.0, "tip_style": "winglet", "stall_deg": 15.0})],
 		"htail": _htail(1.62, 0.04, 0.75, 0.24, 0.09, {"sweep": 36.0, "elev_cf": 0.33, "dihedral": 7.0}),
 		"vtails": [_vtail(1.48, 0.10, 0.38, 0.38, 0.13, {"sweep": 45.0, "rudder_cf": 0.33})],
@@ -516,20 +516,20 @@ static func _build() -> Array:
 			[0.60, 0.07, 0.075, 0.0, 2.0], [1.50, 0.07, 0.075, 0.0, 2.0], [1.85, 0.05, 0.06, 0.01, 2.0],
 			[2.05, 0.012, 0.03, 0.02, 2.0]],
 		"canopy": {"z0": 0.26, "z1": 0.34, "hw": 0.045, "hh": 0.02, "y": 0.052, "style": "cockpit", "tint": Color(0.05, 0.06, 0.08)},
-		"wings": [_wing(0.78, -0.05, 0.92, 1.05, 0.06, {"dihedral": 0.0, "incidence": 1.0, "washout": 0.0, "thick": 0.035,
-			"camber": 0.0, "ail": [0.12, 0.92, 0.12], "flap": [], "sweep": 58.0, "tip_style": "square", "elevon": true, "stall_deg": 32.0, "x0": 0.06})],
+		"wings": [_wing(0.78, -0.05, 0.92, 1.05, 0.06, {"dihedral": 0.0, "incidence": 3.0, "washout": 0.0, "thick": 0.035,
+			"camber": 0.0, "ail": [0.12, 0.92, 0.3], "flap": [], "sweep": 58.0, "tip_style": "square", "elevon": true, "stall_deg": 32.0, "x0": 0.06})],
 		"htail": {},
 		"vtails": [_vtail(1.45, 0.07, 0.34, 0.52, 0.14, {"sweep": 55.0, "rudder_cf": 0.3})],
 		"engines": [
-			_edf(Vector3(-0.22, -0.10, 1.55), 64.0, 13.0, 50.0, 45.0, 0.2, {"intake": "box", "nacelle": {"len": 0.40, "r": 0.04, "box": true}}),
-			_edf(Vector3(-0.13, -0.10, 1.55), 64.0, 13.0, 50.0, 45.0, 0.2, {"intake": "box", "nacelle": {"len": 0.40, "r": 0.04, "box": true}}),
-			_edf(Vector3(0.13, -0.10, 1.55), 64.0, 13.0, 50.0, 45.0, 0.2, {"intake": "box", "nacelle": {"len": 0.40, "r": 0.04, "box": true}, "spin": -1}),
-			_edf(Vector3(0.22, -0.10, 1.55), 64.0, 13.0, 50.0, 45.0, 0.2, {"intake": "box", "nacelle": {"len": 0.40, "r": 0.04, "box": true}, "spin": -1})],
+			_edf(Vector3(-0.22, -0.10, 1.55), 64.0, 10.5, 48.0, 38.0, 0.2, {"intake": "box", "nacelle": {"len": 0.40, "r": 0.04, "box": true}}),
+			_edf(Vector3(-0.13, -0.10, 1.55), 64.0, 10.5, 48.0, 38.0, 0.2, {"intake": "box", "nacelle": {"len": 0.40, "r": 0.04, "box": true}}),
+			_edf(Vector3(0.13, -0.10, 1.55), 64.0, 10.5, 48.0, 38.0, 0.2, {"intake": "box", "nacelle": {"len": 0.40, "r": 0.04, "box": true}, "spin": -1}),
+			_edf(Vector3(0.22, -0.10, 1.55), 64.0, 10.5, 48.0, 38.0, 0.2, {"intake": "box", "nacelle": {"len": 0.40, "r": 0.04, "box": true}, "spin": -1})],
 		"gear": {"type": "tricycle", "retract": true, "wheels": [
 			_wheel(0, -0.26, 0.45, 0.026, {"len": 0.20, "steer": true, "style": "oleo", "brake": false, "twin": true}),
-			_wheel(-0.16, -0.25, 1.30, 0.032, {"len": 0.19, "style": "bogie"}),
-			_wheel(0.16, -0.25, 1.30, 0.032, {"len": 0.19, "style": "bogie"})]},
-		"cg": 0.16, "rates": {"ail": 14.0, "elev": 16.0, "rud": 20.0, "flap": 0.0},
+			_wheel(-0.16, -0.25, 1.23, 0.032, {"len": 0.19, "style": "bogie"}),
+			_wheel(0.16, -0.25, 1.23, 0.032, {"len": 0.19, "style": "bogie"})]},
+		"cg": 0.17, "rates": {"ail": 20.0, "elev": 26.0, "rud": 20.0, "flap": 0.0},
 		"livery": {"scheme": "sst", "base": Color(0.98, 0.98, 0.99), "a1": Color(0.08, 0.14, 0.42), "a2": Color(0.80, 0.08, 0.12)},
 		"labels": [{"text": "MACH ARROW", "z": 0.70, "y": 0.03, "size": 0.04, "color": Color(0.08, 0.14, 0.42)}],
 		"batteries": [_batt("2x 4S 4000 mAh (parallel)", 4, 8.0, 0.86), _batt("2x 4S 5000 mAh (parallel)", 4, 10.0, 1.02)],

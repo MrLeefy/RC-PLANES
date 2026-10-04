@@ -6,6 +6,14 @@ Date: 2026-09-26 · Build: 0.9.0 (versionCode 9) · Godot 4.7.2 stable · Jolt �
 - All tests were run on a **Linux x86-64 cloud container**: headless Godot for physics/logic tests, and the Vulkan **software rasterizer (lavapipe)** under Xvfb for screenshots.
 - **Nothing has been run on a physical Android device.** The APKs were built, zip-aligned, signed and verified (`apksigner verify`), but never installed or launched on a phone. No Android frame rate, thermal, memory, touch-latency or audio-latency figure has been measured.
 
+## Realism pass (2026-10-04): `-- --upgrade-test` 247 / 247 PASS
+- Run with `godot --headless --fixed-fps 120 --path . -- --upgrade-test` (the same suite also runs in real time, just slowly). `tests/realism_tests.gd` adds, for **each of the 16 aircraft**: rest on gear / prop clearance, control polarity and surface following, retracts and flaps, take-off, stall, spin and recovery, hands-off cruise, ordinary landing and roll-out, damage and repair; plus spec envelopes, mass book-keeping, audio family spectra, and fuel/detached-part mass effects.
+- `tests/flight_test.tscn` completes without errors for all 16 aircraft (printing bench, not pass/fail). It still reports small spawn-drop damage at rest for Cargomaster (0.19) and Skyliner (0.34); the asserted rest test places them without damage.
+- Fixes found by the suite: Mach Arrow could not rotate (wing incidence 3 deg, mains moved forward, larger elevon chord/throw); Valor wing-drop at stall (washout 2.5 deg); test-harness state leaking from the base suites (wind, per-aircraft config) now reset.
+- Rendering: turntable views of all 16 aircraft (three-quarter and gear-up) rendered under lavapipe and inspected; no new defects found in the views checked (Mach Arrow, Valor looked at closely, others at thumbnail level).
+- APK: `build/RCPark-debug.apk` re-exported and signed with apksigner (28.99 MB). Not installed on a device.
+- Not measured here: Android frame rate, thermals, audio latency, touch feel. Software-rendered screenshots only.
+
 ## Automated suite (`-- --test`): 28 / 28 PASS
 - **PASS** transmitter: Linear preset is exactly linear
 - **PASS** transmitter: expo softens centre

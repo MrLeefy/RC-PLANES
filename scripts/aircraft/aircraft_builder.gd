@@ -80,6 +80,8 @@ func build(def: Dictionary, config: Dictionary, detail := 2) -> Dictionary:
 		"root": root, "comps": comps, "surfaces": surfaces, "panels": panels,
 		"engines": engines, "wheels": wheels, "cg": _cg, "mass": _total_mass,
 		"fractures": fractures, "mac": _mac, "length": length, "span": _max_span(), "parts": parts,
+		"ballast": ballast, "payload_mass": payload_mass, "payload_kind": payload_kind,
+		"radio_mass": radio_mass, "cg_free": cg_free,
 	}
 
 func _max_span() -> float:
@@ -419,7 +421,27 @@ func _wing_chord_frac(p: Vector3) -> float:
 	return clampf((p.z - zle) / c, 0.0, 1.0)
 
 func _pfn(zone: String) -> Callable:
-	return func(p: Vector3, n: Vector3) -> Color: return paint(zone, p, n)
+	return func(p: Vector3, n: Vector3, aa := false) -> Color:
+		return paint_aa(zone, p, n) if aa else paint(zone, p, n)
+
+## Anti-aliased livery: 5 taps on the surface tangent plane, averaged in linear space, so a
+## hard-edged stripe/camo boundary becomes a ~1 cm soft edge that the mesh refinement can resolve
+## as a clean line instead of vertex-quantised stair steps.
+func paint_aa(zone: String, p: Vector3, n: Vector3) -> Color:
+	if zone == "blade" or zone == "strut" or zone == "gear" or zone == "frame":
+		return paint(zone, p, n)
+	var r := clampf(length * 0.0016, 0.0022, 0.0045)
+	var t1 := n.cross(Vector3.UP)
+	if t1.length_squared() < 1e-4:
+		t1 = n.cross(Vector3.RIGHT)
+	t1 = t1.normalized() * r
+	var t2 := n.cross(t1).normalized() * r
+	var c0 := paint(zone, p, n) * 2.0
+	var c1 := paint(zone, p + t1, n)
+	var c2 := paint(zone, p - t1, n)
+	var c3 := paint(zone, p + t2, n)
+	var c4 := paint(zone, p - t2, n)
+	return (c0 + c1 + c2 + c3 + c4) / 6.0
 
 # ---------------------------------------------------------------- fuselage
 func _ring(z: float, segs: int, scale := 1.0) -> PackedVector3Array:
@@ -1502,7 +1524,8 @@ func _build_wheel(wd: Dictionary, gi: int) -> void:
 				if String(e["type"]) in ["electric", "glow2", "glow4", "gas2"]:
 					var pr := _prop_choice(e)
 					var tip_y: float = float((e["pos"] as Vector3).y) - float(pr["d"]) * 0.5
-					need = minf(need, tip_y - travel0 * 1.2 - 0.03)
+					# taildraggers flare and touch down on the mains in a shallow attitude, so give them more prop margin
+					need = minf(need, tip_y - travel0 * 1.2 - (0.05 if not tricycle else 0.03))
 		if c.y - r > need:
 			var dy := (c.y - r) - need
 			c.y -= dy
@@ -1677,6 +1700,9 @@ var _mac := {}
 var ballast := 0.0
 var payload_mass := 0.0
 var payload_kind := ""
+var radio_mass := 0.0
+var radio_z := 0.0
+var cg_free := Vector2.ZERO   # CG range (fraction of MAC) reachable by sliding the battery, before any ballast
 
 func _mac_of(w: Dictionary) -> Dictionary:
 	var rc := float(w["root"])
@@ -1729,7 +1755,11 @@ func _assign_masses() -> void:
 	var eng_mass := 0.0
 	for e in d["engines"]:
 		eng_mass += float(e["mass"])
-	var structure := maxf(float(d["mass"]) - eng_mass, float(d["mass"]) * 0.3)
+	# Glow / gas / turbine models carry a receiver pack + servo block that the pilot positions to
+	# set the CG (like a battery in an electric model). It is part of the listed mass, not extra.
+	var etype0 := String(d["engines"][0]["type"])
+	radio_mass = 0.0 if etype0 in ["electric", "edf"] else float(d["mass"]) * 0.09
+	var structure := maxf(float(d["mass"]) - eng_mass - radio_mass, float(d["mass"]) * 0.3)
 	for i in comps.size():
 		var c: Dictionary = comps[i]
 		c["mass"] = structure * float(W[i]) / tot
@@ -1788,6 +1818,24 @@ func _assign_masses() -> void:
 		pay_z = z_target - c_mac * 0.05
 	var zmin := maxf(z_nose - length * 0.03, float(d["fuselage"][0][0]) + length * 0.04)
 	var zmax := z_split - 0.02
+	if radio_mass > 0.0:
+		# fuel tank sits at its fixed station; the radio block slides to trim the CG
+		pay_z = clampf(z_target - c_mac * 0.05, zmin, zmax)
+		var m_tank := m0 + pay
+		var mz_tank := mz + pay * pay_z
+		var rz := (z_target * (m_tank + radio_mass) - mz_tank) / radio_mass
+		rz = clampf(rz, zmin, zmax)
+		(core["point_masses"] as Array).append({"pos": Vector3(0, float(_fus_param(rz)[2]) - float(_fus_param(rz)[1]) * 0.35, rz), "m": radio_mass, "size": Vector3(0.05, 0.05, 0.12), "radio": true})
+		core["mass"] = float(core["mass"]) + radio_mass
+		m0 += radio_mass
+		mz += radio_mass * rz
+		radio_z = rz
+	var free_lo := 0.0
+	var free_hi := 0.0
+	if payload_kind == "battery" and pay > 0.0:
+		free_lo = (mz + pay * zmin) / (m0 + pay)
+		free_hi = (mz + pay * zmax) / (m0 + pay)
+	cg_free = Vector2((free_lo - float(_mac["zle"])) / maxf(c_mac, 1e-4), (free_hi - float(_mac["zle"])) / maxf(c_mac, 1e-4))
 	pay_z = clampf(pay_z, zmin, zmax)
 	payload_mass = pay
 	(core["point_masses"] as Array).append({"pos": Vector3(0, float(_fus_param(pay_z)[2]) - float(_fus_param(pay_z)[1]) * 0.3, pay_z), "m": pay, "size": Vector3(0.05, 0.04, 0.12), "payload": true})

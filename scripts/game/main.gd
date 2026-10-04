@@ -36,7 +36,7 @@ func _ready() -> void:
 	world.add_child(cam)
 	_apply_graphics()
 	if "--test" in OS.get_cmdline_user_args() or "--upgrade-test" in OS.get_cmdline_user_args():
-		var suite := "res://tests/upgrade_tests.gd" if "--upgrade-test" in OS.get_cmdline_user_args() else "res://tests/test_runner.gd"
+		var suite := OS.get_environment("RC_SUITE") if OS.get_environment("RC_SUITE") != "" else "res://tests/realism_tests.gd" if "--upgrade-test" in OS.get_cmdline_user_args() else "res://tests/test_runner.gd"
 		var t = load(suite).new()
 		add_child(t)
 		return

@@ -152,6 +152,10 @@ func setup(definition: Dictionary, config: Dictionary, detail_level := 2, for_di
 	for s in surfaces:
 		s["health"] = 1.0
 		s["dead"] = false
+		s["is_flap"] = false
+		for mx in s["mix"]:
+			if int(mx[0]) == 3:
+				s["is_flap"] = true
 	for w in wheels:
 		w["comp_now"] = 0.0
 		w["prev_comp"] = 0.0
@@ -177,7 +181,10 @@ func setup(definition: Dictionary, config: Dictionary, detail_level := 2, for_di
 	# physics body config
 	collision_layer = Game.L_AIRCRAFT
 	collision_mask = Game.L_WORLD | Game.L_NPC | Game.L_DEBRIS | Game.L_GATE
-	continuous_cd = true
+	# Jolt's LinearCast CCD teleports bodies with our hull/box colliders (observed: the airframe or debris
+	# jumping 10^4..10^5 m after an impact, half of all steep crashes). Tunnelling is prevented instead by
+	# the explicit swept probes in _sweep_probes() plus the length of the airframe along its own motion.
+	continuous_cd = false
 	can_sleep = false
 	contact_monitor = true
 	max_contacts_reported = 16
@@ -193,6 +200,7 @@ func setup(definition: Dictionary, config: Dictionary, detail_level := 2, for_di
 	physics_material_override = pm
 	recompute_mass()
 	has_htail = not (def["htail"] as Dictionary).is_empty()
+	_build_probes()
 	compute_factory_trim()
 	gear_down = true
 	gear_pos = 1.0
@@ -519,6 +527,7 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 		terrain_agl = maxf(0.0, com_w.y - Game.field.ground_y(com_w))
 	else:
 		terrain_agl = 0.0
+	_sweep_probes(state, space, xf, v_w, dt)
 	# ---- control mixing & servos ----
 	_mix_controls(dt, B, w_l, air_l)
 	var F := Vector3.ZERO
@@ -572,7 +581,7 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	if agl < span:
 		var hb := maxf(agl, 0.02) / maxf(span, 0.1)
 		ge_phi = (16.0 * hb) * (16.0 * hb) / (1.0 + (16.0 * hb) * (16.0 * hb))
-	var aero := _aero(v_l, w_l, wind_l, wind_tip_l, ge_phi, true)
+	var aero := _aero(v_l, w_l, wind_l, wind_tip_l, ge_phi, true, dt)
 	F += aero[0]
 	T += aero[1]
 	# ---- fuselage & gear parasitic drag ----
@@ -662,7 +671,7 @@ func _random_exposed_comp() -> int:
 	return chosen
 
 ## Per-panel aerodynamics (body frame). Returns [force, torque about CG].
-func _aero(v_l: Vector3, w_l: Vector3, wind_l: Vector3, wind_tip_l: Vector3, ge_phi: float, update_state: bool) -> Array:
+func _aero(v_l: Vector3, w_l: Vector3, wind_l: Vector3, wind_tip_l: Vector3, ge_phi: float, update_state: bool, dt := 0.0) -> Array:
 	var F := Vector3.ZERO
 	var T := Vector3.ZERO
 	var cl_sum := 0.0
@@ -676,9 +685,19 @@ func _aero(v_l: Vector3, w_l: Vector3, wind_l: Vector3, wind_tip_l: Vector3, ge_
 		var r: Vector3 = (p["pos"] as Vector3) - com_local
 		# local wind incl. spanwise turbulence gradient
 		var v_p := v_l + w_l.cross(r) - wind_l - wind_tip_l * (p["pos"] as Vector3).x
+		var proll := String(p["role"])
 		for wsh in p["wash"]:
 			var e2: Propulsion = engines[int(wsh[0])]
-			v_p += e2.dir * e2.wash_v * float(wsh[1])
+			var wf := float(wsh[1])
+			v_p += e2.dir * e2.wash_v * wf
+			# slipstream swirl: it rotates with the prop. On the fin it is a side-force (the reason a
+			# single-engine tractor yaws on power-up); on the wing it adds alpha on one side and
+			# removes it on the other (partly cancels the torque roll). Scales with thrust loading.
+			var sw := minf(e2.wash_v * 0.035, 0.035 * maxf(v_p.length(), 3.0)) * wf * e2.spin   # <= ~2 deg swirl angle
+			if proll == "vtail":
+				v_p.x -= sw
+			elif proll == "wing":
+				v_p.y += sw * signf((p["pos"] as Vector3).x)
 		var sd: Vector3 = p["span"]
 		var v2 := v_p - sd * v_p.dot(sd)
 		var V2 := v2.length()
@@ -691,6 +710,7 @@ func _aero(v_l: Vector3, w_l: Vector3, wind_l: Vector3, wind_tip_l: Vector3, ge_
 		if role == "htail":
 			alpha -= downwash
 		var dal := 0.0
+		var dal_f := 0.0
 		var cdc := 0.0
 		var cmc := 0.0
 		var area_f := float(p["eff"])
@@ -703,6 +723,7 @@ func _aero(v_l: Vector3, w_l: Vector3, wind_l: Vector3, wind_tip_l: Vector3, ge_
 			var ad := absf(dl)
 			var dd := float(c["tau"]) * float(c["frac"]) * float(s["health"]) * dl * (1.0 - 0.28 * minf(ad / 0.6, 1.0))
 			dal += dd
+			dal_f += dd
 			cdc += 1.1 * float(c["frac"]) * float(c["cf"]) * sin(ad) * sin(ad)
 			cmc -= (0.15 + 0.35 * float(c["cf"])) * dd * float(p["cla"]) * (1.0 - float(c["cf"]))
 		area_f = maxf(area_f, 0.0)
@@ -711,14 +732,31 @@ func _aero(v_l: Vector3, w_l: Vector3, wind_l: Vector3, wind_tip_l: Vector3, ge_
 		if role == "wing" and ge_on:
 			cla *= 1.0 + 0.12 * (1.0 - ge_phi)
 		var a0 := float(p["a0"])
-		var st := float(p["stall"])
+		# Reynolds number of this panel: small RC wings fly at 5e4..4e5, where skin friction is high and
+		# the section stalls earlier than the full-scale numbers the data was tuned around (Re 3e5).
+		var re := V2 * float(p["chord"]) / 1.5e-5
+		var re_f := clampf(pow(3.0e5 / maxf(re, 2.0e4), 0.2), 0.82, 1.45)
+		var st := float(p["stall"]) - deg_to_rad(2.2) * clampf(log(3.0e5 / maxf(re, 2.0e4)) / 1.0986, -0.6, 1.0)
 		var a_eff := alpha - a0 + dal
-		var ap := st - a0
-		var an := st + a0
+		# A deflected plain flap/aileron/elevator shifts the lift curve AND raises CL max: the stall angle only
+		# moves by ~10 % of the geometric shift (a 40 degree flap adds ~0.8-1.0 CL max). Without this a flapped
+		# wing stalls EARLIER at the same CL max (flaps would raise the stall speed), and a down aileron would
+		# stall its tip first, so using ailerons at the stall made the wing drop WORSE.
+		var ap := st - a0 + 0.9 * maxf(dal_f, 0.0)
+		var an := st + a0 + 0.9 * maxf(-dal_f, 0.0)
 		var M := 28.0
 		var e1 := exp(clampf(-M * (a_eff - ap), -40.0, 40.0))
 		var e2x := exp(clampf(M * (a_eff + an), -40.0, 40.0))
 		var sigma := (1.0 + e1 + e2x) / ((1.0 + e1) * (1.0 + e2x))
+		if dt > 0.0:
+			# dynamic stall: the separation state lags the static curve (flow needs a few chord-lengths to
+			# detach, and longer to re-attach). Gives stall hysteresis and the delayed break in snap rolls.
+			var ps := float(p.get("sig_s", sigma))
+			var tc_f := float(p["chord"]) / maxf(V2, 2.0)
+			var tau := minf((2.5 if sigma > ps else 6.0) * tc_f, 0.25)
+			ps += (sigma - ps) * (1.0 - exp(-dt / maxf(tau, 1e-3)))
+			p["sig_s"] = ps
+			sigma = ps
 		var cl_lin := cla * a_eff
 		var a_fp := alpha + dal * 0.5
 		var sa := sin(a_fp)
@@ -727,7 +765,7 @@ func _aero(v_l: Vector3, w_l: Vector3, wind_l: Vector3, wind_tip_l: Vector3, ge_
 		var cl := (1.0 - sigma) * cl_lin + sigma * cl_fp
 		var k_ind := 1.0 / (PI * 0.8 * maxf(ar, 0.3))
 		var cd_i := cl_lin * cl_lin * k_ind * (ge_phi if role == "wing" else 1.0)
-		var cd := float(p["cd0"]) + cdc + (1.0 - sigma) * cd_i + sigma * 1.28 * sa * sa + 0.012 * a_eff * a_eff
+		var cd := float(p["cd0"]) * re_f + cdc + (1.0 - sigma) * cd_i + sigma * 1.28 * sa * sa + 0.012 * a_eff * a_eff
 		var q := 0.5 * RHO * V2 * V2
 		var area := float(p["area"]) * area_f
 		if role == "vtail" and has_htail:
@@ -741,6 +779,12 @@ func _aero(v_l: Vector3, w_l: Vector3, wind_l: Vector3, wind_tip_l: Vector3, ge_
 		T += r_app.cross(fp)
 		# section pitching moment (camber + control-surface deflection), fades after stall
 		var cm := (float(p.get("cm0", 0.0)) + cmc) * (1.0 - sigma)
+		# chordwise "camber" damping: a section pitching at rate w sees an alpha that varies along its chord,
+		# giving a restoring moment cm_q * (w c / 2V) about its own span axis (thin-airfoil cm_q ~ -pi/2,
+		# reduced here for viscous effects). Negligible on a tailed airplane, it is what damps the short
+		# period of a long-chord delta or flying wing.
+		var wq := w_l.dot(sd)
+		cm -= 0.9 * wq * float(p["chord"]) / (2.0 * V2) * (1.0 - sigma)
 		if cm != 0.0:
 			T += sd * (cm * q * area * float(p["chord"]))
 		if update_state:
@@ -758,9 +802,13 @@ func _aero(v_l: Vector3, w_l: Vector3, wind_l: Vector3, wind_tip_l: Vector3, ge_
 var pitch_trim := 0.0
 var has_htail := true
 
+## Airspeed the factory elevator trim is set for (a pre-trimmed ARF is trimmed for its normal cruise).
+func trim_speed() -> float:
+	return sqrt(2.0 * mass * G / (RHO * ref_area * float(def.get("trim_cl", 0.36))))
+
 func compute_factory_trim() -> void:
-	var cl_target := 0.36
-	var v_t := sqrt(2.0 * mass * G / (RHO * ref_area * cl_target))
+	var cl_target := float(def.get("trim_cl", 0.36))
+	var v_t := trim_speed()
 	var saved_cl := wing_cl
 	var best := 0.0
 	var lo := -0.6
@@ -774,8 +822,41 @@ func compute_factory_trim() -> void:
 			lo = mid
 		best = mid
 	pitch_trim = clampf(best, -0.65, 0.65)
-	# roll trim against prop torque at cruise (what a pilot trims out on the first flight)
+	# Trim for level-flight power, like a pilot does on the first flight: find the throttle that holds
+	# v_t, add the pitching moment of the thrust lines (an engine below/above the CG pitches the nose
+	# up/down with power) and re-solve the elevator. Then roll trim against the prop torque.
 	var tq := 0.0
+	var any_prop := false
+	for en in engines:
+		any_prop = any_prop or (en as Propulsion).is_prop()
+	var thr_lvl := clampf(AircraftSpecs.level_throttle(self, v_t), 0.08, 1.0)
+	var th: Dictionary = AircraftSpecs._thrust_at(self, v_t, thr_lvl)
+	var mt := 0.0
+	for ei in engines.size():
+		if ei < (th["per"] as Array).size() and not (comps[int(eng_defs[ei]["comp"])]["detached"]):
+			var r_e: Vector3 = (engines[ei] as Propulsion).pos - com_local
+			var f_e: Vector3 = (engines[ei] as Propulsion).dir * float(th["per"][ei])
+			mt += r_e.cross(f_e).x
+	_trim_extra_moment = mt
+	# slipstream over wing and tail at this power (momentum theory, as in the flight model) shifts the pitch trim
+	for ei in engines.size():
+		var en2: Propulsion = engines[ei]
+		if en2.is_prop() and ei < (th["per"] as Array).size():
+			var area := PI * en2.D * en2.D * 0.25
+			var vi := 0.5 * (-v_t + sqrt(v_t * v_t + 2.0 * maxf(float(th["per"][ei]), 0.0) / (RHO * area)))
+			en2.wash_v = vi * 1.7
+	lo = -0.6
+	hi = 0.6
+	for it in 22:
+		var mid2 := (lo + hi) * 0.5
+		if _trim_moment(mid2, v_t) > 0.0:
+			hi = mid2
+		else:
+			lo = mid2
+		best = mid2
+	pitch_trim = clampf(best, -0.65, 0.65)
+	for en3 in engines:
+		(en3 as Propulsion).wash_v = 0.0
 	for ei in engines.size():
 		var e: Propulsion = engines[ei]
 		if not e.is_prop():
@@ -783,13 +864,15 @@ func compute_factory_trim() -> void:
 		var pr := Propulsion.new()
 		pr.setup(eng_defs[ei])
 		pr.running = true
+		if pr.type in ["glow2", "glow4", "gas2"]:
+			pr.omega = float(pr.d["rpm_peak"]) * 0.3 * TAU / 60.0   # already running, as in flight
 		var bat := {"v": 3.85 * bat_cells, "v_nom": 3.8 * bat_cells, "lvc": 1.0}
 		for k in 600:
-			pr.step(0.01, 0.5, v_t * 1.25, bat, true)
+			pr.step(0.01, thr_lvl, v_t, bat, true)
 		tq += pr.spin * pr.torque
 	if absf(tq) > 1e-4:
 		var a_t := _trim_alpha
-		var v_l := Vector3(0, -sin(a_t * 0.6), -cos(a_t * 0.6)) * v_t * 1.25
+		var v_l := Vector3(0, -sin(a_t * 0.6), -cos(a_t * 0.6)) * v_t
 		_set_elev(pitch_trim)
 		var m0 := (_aero(v_l, Vector3.ZERO, Vector3.ZERO, Vector3.ZERO, 1.0, false)[1] as Vector3).z
 		for s in surfaces:
@@ -806,6 +889,7 @@ func compute_factory_trim() -> void:
 
 var roll_trim := 0.0
 var _trim_alpha := 0.0
+var _trim_extra_moment := 0.0   # thrust-line pitching moment at level-flight power, included in the trim solve
 
 func _set_elev(elev: float) -> void:
 	for s in surfaces:
@@ -837,7 +921,7 @@ func _trim_moment(elev: float, v: float) -> float:
 		_trim_alpha = a
 	for s in surfaces:
 		s["defl"] = 0.0
-	return Tm
+	return Tm + _trim_extra_moment
 
 # ================================================================ control mixing
 func _mix_controls(dt: float, B: Basis, w_l: Vector3, air_l: Vector3) -> void:
@@ -1026,9 +1110,20 @@ func _gear_peak_eval(w: Dictionary, at: Vector3) -> void:
 	w["peak_done"] = true
 	var ratio := float(w["peak"]) / maxf(float(w["load"]), 0.01)
 	w["last_peak_g"] = maxf(float(w.get("last_peak_g", 0.0)), ratio)
-	if damage_mode == "off" or ratio <= 14.0:
+	# Load (in multiples of the static wheel load) the leg tolerates before it bends. Oleos and fat bush
+	# tyres take far more than a wire/spring leg; the airframe's strength rating scales it a little.
+	var lim := 14.0
+	match String(w["style"]):
+		"oleo", "bogie", "pod": lim = 26.0
+		"bush": lim = 30.0
+		"strut": lim = 22.0
+		"spring": lim = 20.0
+		"wire": lim = 16.0
+		"tail": lim = 18.0
+	lim *= clampf(float(def["strength"]), 0.8, 1.6) ** 0.5
+	if damage_mode == "off" or ratio <= lim:
 		return
-	var sev := (ratio - 14.0) / 14.0
+	var sev := (ratio - lim) / lim
 	if damage_mode == "physical":
 		w["bent"] = clampf(float(w["bent"]) + sev * 0.35, 0.0, 1.0)
 		w["hp"] = float(w["hp"]) - sev * 0.45
@@ -1042,6 +1137,92 @@ func SURF_FROM(collider, p: Vector3) -> int:
 	if collider and collider is Object and (collider as Object).has_meta("surface"):
 		return int((collider as Object).get_meta("surface"))
 	return Game.surface_at(p)
+
+
+# ================================================================ swept collision probes
+## With Jolt CCD off, a fast aircraft could in theory step over a thin obstacle with just its wing tip.
+## Above ~35 m/s (more than ~0.28 m per 120 Hz step) we cast rays from the nose, wing tips and tail along
+## the step; a probe that would cross a solid inside the step is stopped on the surface and takes the
+## impact (so it hurts exactly like a real contact would), and the normal velocity is removed.
+var _probes: Array = []
+
+func _comp_by_id(cid: String) -> int:
+	for i in comps.size():
+		if String(comps[i]["id"]) == cid:
+			return i
+	return -1
+
+func _build_probes() -> void:
+	_probes.clear()
+	var fus: Array = def["fuselage"]
+	var nose_c := _comp_by_id("nose")
+	_probes.append([Vector3(0, float(fus[0][3]), 0.0), nose_c if nose_c >= 0 else 0])
+	_probes.append([Vector3(0, float(fus[fus.size() - 1][3]), length_m), maxi(_comp_by_id("tail_boom"), 0)])
+	for wi in (def["wings"] as Array).size():
+		var w: Dictionary = def["wings"][wi]
+		var half := float(w["span"]) * 0.5
+		var tz := float(w["z"]) + tan(deg_to_rad(float(w["sweep"]))) * half
+		var ty := float(w["y"]) + sin(deg_to_rad(float(w["dihedral"]))) * half
+		for sd in ["L", "R"]:
+			var ci := _comp_by_id("tip%d_%s" % [wi, sd])
+			if ci < 0:
+				ci = _comp_by_id("wing%d_%s" % [wi, sd])
+			_probes.append([Vector3((-1.0 if sd == "L" else 1.0) * half, ty, tz), maxi(ci, 0)])
+
+func _sweep_probes(state: PhysicsDirectBodyState3D, space: PhysicsDirectSpaceState3D, xf: Transform3D, v_w: Vector3, dt: float) -> void:
+	var move := v_w * dt
+	var ml := move.length()
+	if ml < 0.28 or contact_grace > 0:
+		return
+	var dir := move / ml
+	var best := ml
+	var hit_n := Vector3.UP
+	var hit_p := Vector3.ZERO
+	var hit_ci := -1
+	var hit_col: Object = null
+	for pr in _probes:
+		var ci := int(pr[1])
+		if comps[ci]["detached"]:
+			continue
+		var p0 := xf * (pr[0] as Vector3)
+		_ray_params.from = p0
+		_ray_params.to = p0 + move * 1.03
+		var hit := space.intersect_ray(_ray_params)
+		if hit.is_empty():
+			continue
+		var d := p0.distance_to(hit["position"])
+		if d < best and -v_w.dot(hit["normal"]) > 3.0:
+			best = d
+			hit_n = hit["normal"]
+			hit_p = hit["position"]
+			hit_ci = ci
+			hit_col = hit.get("collider")
+	if hit_ci < 0 or best >= ml:
+		return
+	var closing := -v_w.dot(hit_n)
+	var hard := 1.0
+	var kind := "ground"
+	if hit_col:
+		hard = float(hit_col.get_meta("hardness", 1.0))
+		kind = String(hit_col.get_meta("kind", "ground"))
+		if hit_col.has_method("hit_by_aircraft"):
+			hit_col.hit_by_aircraft(self, v_w.length(), -hit_n, hit_p)
+		if hit_col.has_method("knock"):
+			hit_col.knock(-hit_n * closing * mass, hit_p)
+	# stop the probe on the surface (pull the body back by the overshoot) and remove the normal velocity
+	var t := state.transform
+	t.origin += dir * (best - ml)
+	state.transform = t
+	state.linear_velocity = v_w - hit_n * v_w.dot(hit_n) * 1.05
+	var sev := closing * hard
+	impact_log.append({"t": sim_t, "comp": comps[hit_ci]["id"], "sev": sev, "kind": kind + "_swept"})
+	if impact_log.size() > 40:
+		impact_log.pop_front()
+	last_contact_speed = closing
+	max_impact = maxf(max_impact, sev)
+	_damage(hit_ci, sev, hit_p, hit_n, kind)
+	if sev > 25.0 and damage_mode == "physical":
+		_inertial_shock(sev * 6.0, hit_p)
 
 # ================================================================ contacts & damage
 var contact_grace := 0
@@ -1310,7 +1491,7 @@ func detach(ci: int, info := {}) -> void:
 		rb.sleeping = false
 		rb.linear_velocity = linear_velocity + angular_velocity.cross(p_w - com_w)
 		rb.angular_velocity = angular_velocity + Vector3(Game.rng.randf_range(-3, 3), Game.rng.randf_range(-3, 3), Game.rng.randf_range(-3, 3))
-		rb.continuous_cd = linear_velocity.length() > 15.0
+		rb.continuous_cd = false
 		rb.call("ignore_temporarily", self, 0.35, true)
 		if rb.has_method("activate"):
 			rb.activate()
@@ -1439,6 +1620,8 @@ func place(xf: Transform3D, speed := 0.0) -> void:
 	curr_xf = xf
 	last_vel = v
 	contact_grace = 3
+	for pn in panels:
+		pn.erase("sig_s")
 	for w2 in wheels:
 		w2["peak"] = 0.0
 		w2["peak_done"] = false
@@ -1483,7 +1666,7 @@ func snapshot() -> Dictionary:
 	var panel_state := []
 	for panel in panels:
 		var values := {}
-		for key in ["alive", "eff", "cd0", "cl", "sigma"]:
+		for key in ["alive", "eff", "cd0", "cl", "sigma", "sig_s"]:
 			if panel.has(key): values[key] = panel[key]
 		panel_state.append(values)
 	var owners := PackedInt32Array()
@@ -1829,6 +2012,68 @@ func static_margin() -> float:
 	var dM: float = res[1][1] - res[0][1]
 	# moment about CG changes by -x_np*dL; x_np = distance NP behind CG
 	return (-dM / maxf(dL, 1e-5)) / maxf(mac_c, 0.01)
+
+## Diagnostics used by the spec sheet and tests: trimmed-ish level flight at airspeed v (m/s).
+## Finds the body angle of attack where wing lift carries the weight (factory elevator trim,
+## optional flap setting 0..1) and returns the aerodynamic + body drag there.
+func level_flight(v: float, flap := 0.0) -> Dictionary:
+	_set_elev(pitch_trim)
+	for sf in surfaces:
+		for m in sf["mix"]:
+			if int(m[0]) == 3:
+				sf["defl"] = float(sf["defl"]) + float(m[1]) * flap * float(max_defl[3])
+	var saved_cl := wing_cl
+	var a_lo := -0.2
+	var a_hi := 0.6
+	var res := []
+	var a := 0.0
+	var W := mass * G
+	wing_cl = 0.5
+	for it in 16:
+		a = (a_lo + a_hi) * 0.5
+		var v_l := Vector3(0, -sin(a), -cos(a)) * v
+		res = _aero(v_l, Vector3.ZERO, Vector3.ZERO, Vector3.ZERO, 1.0, true)
+		var lift := (res[0] as Vector3).dot(Vector3(0, cos(a), -sin(a)))
+		if lift > W:
+			a_hi = a
+		else:
+			a_lo = a
+	var vhat := Vector3(0, -sin(a), -cos(a))
+	var fa: Vector3 = res[0]
+	var vb := vhat * v
+	var bd := Vector3(
+		-0.5 * RHO * float(body_drag["side_cda"]) * vb.x * absf(vb.x),
+		-0.5 * RHO * float(body_drag["top_cda"]) * vb.y * absf(vb.y),
+		-0.5 * RHO * float(body_drag["front_cda"]) * vb.z * absf(vb.z))
+	bd += -0.5 * RHO * float(body_drag["gear_cda"]) * vb * vb.length()
+	var drag := -(fa + bd).dot(vhat)
+	var lift_total := (fa + bd).dot(Vector3(0, cos(a), -sin(a)))
+	for sf in surfaces:
+		sf["defl"] = 0.0
+	wing_cl = saved_cl
+	return {"alpha": a, "drag": drag, "lift": lift_total, "cl": wing_cl, "stalled": a_hi >= 0.59}
+
+## Maximum lift coefficient of the whole airframe (lift / (q * ref_area)), swept in body alpha.
+func cl_max(flap := 0.0) -> float:
+	_set_elev(pitch_trim)
+	for sf in surfaces:
+		for m in sf["mix"]:
+			if int(m[0]) == 3:
+				sf["defl"] = float(sf["defl"]) + float(m[1]) * flap * float(max_defl[3])
+	var saved_cl := wing_cl
+	var best := 0.0
+	var v := 12.0
+	wing_cl = 0.5
+	for k in 60:
+		var a := deg_to_rad(-2.0 + 0.5 * k)
+		var v_l := Vector3(0, -sin(a), -cos(a)) * v
+		var res := _aero(v_l, Vector3.ZERO, Vector3.ZERO, Vector3.ZERO, 1.0, true)
+		var lift := (res[0] as Vector3).dot(Vector3(0, cos(a), -sin(a)))
+		best = maxf(best, lift / (0.5 * RHO * v * v * ref_area))
+	for sf in surfaces:
+		sf["defl"] = 0.0
+	wing_cl = saved_cl
+	return best
 
 # ================================================================ replay playback (visual only)
 func apply_replay(fa: Dictionary, fb: Dictionary, a: float, delta: float) -> void:
