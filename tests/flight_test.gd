@@ -166,7 +166,7 @@ func _run_aircraft(id: String) -> void:
 			t += 1.0 / 120.0
 			var thr := clampf(t / 1.5, 0.0, 1.0)
 			var head_err := wrapf(atan2(-a.global_transform.basis.z.x, -a.global_transform.basis.z.z) - (PI * 0.5), -PI, PI)
-			var yaw := clampf(-head_err * 3.0 - _rates(a).z * 0.3, -1, 1)
+			var yaw := clampf(head_err * 3.0 - _rates(a).z * 0.3, -1, 1)   # head_err > 0 = nose left of the runway axis -> right rudder (+)
 			if a.airspeed < rot_v:
 				var pc := 0.0
 				if taildragger and a.airspeed > vs_est * 0.4:
@@ -177,8 +177,8 @@ func _run_aircraft(id: String) -> void:
 			else:
 				_ap(a, 0.0, deg_to_rad(10.0), thr, yaw * 0.3)
 			await get_tree().physics_frame
-			if OS.get_environment("FTDBG") != "" and i % 60 == 0:
-				print("  t=%.1f spd=%.1f pos=%s pitch=%.1f bank=%.1f wt=%d thr=%.2f rpm=%.0f hdg_err=%.2f crashed=%s" % [t, a.airspeed, str(a.global_position), rad_to_deg(_att(a).y), rad_to_deg(_att(a).x), a.wheels_touching, thr, a.engines[0].rpm(), head_err, a.crashed_flag])
+			if OS.get_environment("FTDBG") != "" and i % int(OS.get_environment("FTDBGN") if OS.get_environment("FTDBGN") != "" else "60") == 0:
+				print("  t=%.2f spd=%.1f pos=%s pitch=%.1f bank=%.1f wt=%d thr=%.2f rpm=%.0f hdg_err=%.2f yawrate=%.2f crashed=%s" % [t, a.airspeed, str(a.global_position), rad_to_deg(_att(a).y), rad_to_deg(_att(a).x), a.wheels_touching, thr, a.engines[0].rpm(), head_err, _rates(a).z, a.crashed_flag])
 				var dm = []
 				for c in a.health_summary():
 					if float(c["hp"]) < 0.99 or c["detached"]: dm.append("%s:%.2f%s" % [c["id"], c["hp"], "X" if c["detached"] else ""])

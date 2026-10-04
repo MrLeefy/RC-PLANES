@@ -572,7 +572,7 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	if agl < span:
 		var hb := maxf(agl, 0.02) / maxf(span, 0.1)
 		ge_phi = (16.0 * hb) * (16.0 * hb) / (1.0 + (16.0 * hb) * (16.0 * hb))
-	var aero := _aero(v_l, w_l, wind_l, wind_tip_l, ge_phi, true)
+	var aero := _aero(v_l, w_l, wind_l, wind_tip_l, ge_phi, true, dt)
 	F += aero[0]
 	T += aero[1]
 	# ---- fuselage & gear parasitic drag ----
@@ -662,7 +662,7 @@ func _random_exposed_comp() -> int:
 	return chosen
 
 ## Per-panel aerodynamics (body frame). Returns [force, torque about CG].
-func _aero(v_l: Vector3, w_l: Vector3, wind_l: Vector3, wind_tip_l: Vector3, ge_phi: float, update_state: bool) -> Array:
+func _aero(v_l: Vector3, w_l: Vector3, wind_l: Vector3, wind_tip_l: Vector3, ge_phi: float, update_state: bool, dt := 0.0) -> Array:
 	var F := Vector3.ZERO
 	var T := Vector3.ZERO
 	var cl_sum := 0.0
@@ -676,9 +676,19 @@ func _aero(v_l: Vector3, w_l: Vector3, wind_l: Vector3, wind_tip_l: Vector3, ge_
 		var r: Vector3 = (p["pos"] as Vector3) - com_local
 		# local wind incl. spanwise turbulence gradient
 		var v_p := v_l + w_l.cross(r) - wind_l - wind_tip_l * (p["pos"] as Vector3).x
+		var proll := String(p["role"])
 		for wsh in p["wash"]:
 			var e2: Propulsion = engines[int(wsh[0])]
-			v_p += e2.dir * e2.wash_v * float(wsh[1])
+			var wf := float(wsh[1])
+			v_p += e2.dir * e2.wash_v * wf
+			# slipstream swirl: it rotates with the prop. On the fin it is a side-force (the reason a
+			# single-engine tractor yaws on power-up); on the wing it adds alpha on one side and
+			# removes it on the other (partly cancels the torque roll). Scales with thrust loading.
+			var sw := minf(e2.wash_v * 0.035, 0.035 * maxf(v_p.length(), 3.0)) * wf * e2.spin   # <= ~2 deg swirl angle
+			if proll == "vtail":
+				v_p.x -= sw
+			elif proll == "wing":
+				v_p.y += sw * signf((p["pos"] as Vector3).x)
 		var sd: Vector3 = p["span"]
 		var v2 := v_p - sd * v_p.dot(sd)
 		var V2 := v2.length()
@@ -711,7 +721,11 @@ func _aero(v_l: Vector3, w_l: Vector3, wind_l: Vector3, wind_tip_l: Vector3, ge_
 		if role == "wing" and ge_on:
 			cla *= 1.0 + 0.12 * (1.0 - ge_phi)
 		var a0 := float(p["a0"])
-		var st := float(p["stall"])
+		# Reynolds number of this panel: small RC wings fly at 5e4..4e5, where skin friction is high and
+		# the section stalls earlier than the full-scale numbers the data was tuned around (Re 3e5).
+		var re := V2 * float(p["chord"]) / 1.5e-5
+		var re_f := clampf(pow(3.0e5 / maxf(re, 2.0e4), 0.2), 0.82, 1.45)
+		var st := float(p["stall"]) - deg_to_rad(2.2) * clampf(log(3.0e5 / maxf(re, 2.0e4)) / 1.0986, -0.6, 1.0)
 		var a_eff := alpha - a0 + dal
 		var ap := st - a0
 		var an := st + a0
@@ -719,6 +733,15 @@ func _aero(v_l: Vector3, w_l: Vector3, wind_l: Vector3, wind_tip_l: Vector3, ge_
 		var e1 := exp(clampf(-M * (a_eff - ap), -40.0, 40.0))
 		var e2x := exp(clampf(M * (a_eff + an), -40.0, 40.0))
 		var sigma := (1.0 + e1 + e2x) / ((1.0 + e1) * (1.0 + e2x))
+		if dt > 0.0:
+			# dynamic stall: the separation state lags the static curve (flow needs a few chord-lengths to
+			# detach, and longer to re-attach). Gives stall hysteresis and the delayed break in snap rolls.
+			var ps := float(p.get("sig_s", sigma))
+			var tc_f := float(p["chord"]) / maxf(V2, 2.0)
+			var tau := minf((2.5 if sigma > ps else 6.0) * tc_f, 0.25)
+			ps += (sigma - ps) * (1.0 - exp(-dt / maxf(tau, 1e-3)))
+			p["sig_s"] = ps
+			sigma = ps
 		var cl_lin := cla * a_eff
 		var a_fp := alpha + dal * 0.5
 		var sa := sin(a_fp)
@@ -727,7 +750,7 @@ func _aero(v_l: Vector3, w_l: Vector3, wind_l: Vector3, wind_tip_l: Vector3, ge_
 		var cl := (1.0 - sigma) * cl_lin + sigma * cl_fp
 		var k_ind := 1.0 / (PI * 0.8 * maxf(ar, 0.3))
 		var cd_i := cl_lin * cl_lin * k_ind * (ge_phi if role == "wing" else 1.0)
-		var cd := float(p["cd0"]) + cdc + (1.0 - sigma) * cd_i + sigma * 1.28 * sa * sa + 0.012 * a_eff * a_eff
+		var cd := float(p["cd0"]) * re_f + cdc + (1.0 - sigma) * cd_i + sigma * 1.28 * sa * sa + 0.012 * a_eff * a_eff
 		var q := 0.5 * RHO * V2 * V2
 		var area := float(p["area"]) * area_f
 		if role == "vtail" and has_htail:
@@ -1439,6 +1462,8 @@ func place(xf: Transform3D, speed := 0.0) -> void:
 	curr_xf = xf
 	last_vel = v
 	contact_grace = 3
+	for pn in panels:
+		pn.erase("sig_s")
 	for w2 in wheels:
 		w2["peak"] = 0.0
 		w2["peak_done"] = false
@@ -1483,7 +1508,7 @@ func snapshot() -> Dictionary:
 	var panel_state := []
 	for panel in panels:
 		var values := {}
-		for key in ["alive", "eff", "cd0", "cl", "sigma"]:
+		for key in ["alive", "eff", "cd0", "cl", "sigma", "sig_s"]:
 			if panel.has(key): values[key] = panel[key]
 		panel_state.append(values)
 	var owners := PackedInt32Array()

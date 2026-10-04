@@ -458,10 +458,10 @@ static func _build() -> Array:
 		"htail": _htail(1.40, 0.10, 0.80, 0.22, 0.13, {"elev_cf": 0.38, "sweep": 6.0}),
 		"vtails": [_vtail(1.32, 0.13, 0.36, 0.33, 0.16, {"sweep": 20.0, "rudder_cf": 0.38})],
 		"engines": [
-			_elec(Vector3(-0.60, 0.11, 0.44), 560.0, 0.050, 0.8, 0.12, {"spinner_r": 0.025, "spinner_len": 0.05, "nacelle": {"len": 0.28, "r": 0.04}}),
-			_elec(Vector3(-0.33, 0.11, 0.42), 560.0, 0.050, 0.8, 0.12, {"spinner_r": 0.025, "spinner_len": 0.05, "nacelle": {"len": 0.30, "r": 0.04}}),
-			_elec(Vector3(0.33, 0.11, 0.42), 560.0, 0.050, 0.8, 0.12, {"spinner_r": 0.025, "spinner_len": 0.05, "nacelle": {"len": 0.30, "r": 0.04}}),
-			_elec(Vector3(0.60, 0.11, 0.44), 560.0, 0.050, 0.8, 0.12, {"spinner_r": 0.025, "spinner_len": 0.05, "nacelle": {"len": 0.28, "r": 0.04}})],
+			_elec(Vector3(-0.60, 0.11, 0.44), 650.0, 0.045, 0.8, 0.12, {"spinner_r": 0.025, "spinner_len": 0.05, "nacelle": {"len": 0.28, "r": 0.04}}),
+			_elec(Vector3(-0.33, 0.11, 0.42), 650.0, 0.045, 0.8, 0.12, {"spinner_r": 0.025, "spinner_len": 0.05, "nacelle": {"len": 0.30, "r": 0.04}}),
+			_elec(Vector3(0.33, 0.11, 0.42), 650.0, 0.045, 0.8, 0.12, {"spinner_r": 0.025, "spinner_len": 0.05, "nacelle": {"len": 0.30, "r": 0.04}}),
+			_elec(Vector3(0.60, 0.11, 0.44), 650.0, 0.045, 0.8, 0.12, {"spinner_r": 0.025, "spinner_len": 0.05, "nacelle": {"len": 0.28, "r": 0.04}})],
 		"gear": {"type": "tricycle", "retract": false, "wheels": [
 			_wheel(0, -0.15, 0.20, 0.035, {"len": 0.06, "steer": true, "style": "oleo", "brake": false}),
 			_wheel(-0.13, -0.15, 0.72, 0.045, {"len": 0.06, "style": "pod"}),
