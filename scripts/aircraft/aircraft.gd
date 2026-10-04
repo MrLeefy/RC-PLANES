@@ -1830,6 +1830,68 @@ func static_margin() -> float:
 	# moment about CG changes by -x_np*dL; x_np = distance NP behind CG
 	return (-dM / maxf(dL, 1e-5)) / maxf(mac_c, 0.01)
 
+## Diagnostics used by the spec sheet and tests: trimmed-ish level flight at airspeed v (m/s).
+## Finds the body angle of attack where wing lift carries the weight (factory elevator trim,
+## optional flap setting 0..1) and returns the aerodynamic + body drag there.
+func level_flight(v: float, flap := 0.0) -> Dictionary:
+	_set_elev(pitch_trim)
+	for sf in surfaces:
+		for m in sf["mix"]:
+			if int(m[0]) == 3:
+				sf["defl"] = float(sf["defl"]) + float(m[1]) * flap * float(max_defl[3])
+	var saved_cl := wing_cl
+	var a_lo := -0.2
+	var a_hi := 0.6
+	var res := []
+	var a := 0.0
+	var W := mass * G
+	wing_cl = 0.5
+	for it in 16:
+		a = (a_lo + a_hi) * 0.5
+		var v_l := Vector3(0, -sin(a), -cos(a)) * v
+		res = _aero(v_l, Vector3.ZERO, Vector3.ZERO, Vector3.ZERO, 1.0, true)
+		var lift := (res[0] as Vector3).dot(Vector3(0, cos(a), -sin(a)))
+		if lift > W:
+			a_hi = a
+		else:
+			a_lo = a
+	var vhat := Vector3(0, -sin(a), -cos(a))
+	var fa: Vector3 = res[0]
+	var vb := vhat * v
+	var bd := Vector3(
+		-0.5 * RHO * float(body_drag["side_cda"]) * vb.x * absf(vb.x),
+		-0.5 * RHO * float(body_drag["top_cda"]) * vb.y * absf(vb.y),
+		-0.5 * RHO * float(body_drag["front_cda"]) * vb.z * absf(vb.z))
+	bd += -0.5 * RHO * float(body_drag["gear_cda"]) * vb * vb.length()
+	var drag := -(fa + bd).dot(vhat)
+	var lift_total := (fa + bd).dot(Vector3(0, cos(a), -sin(a)))
+	for sf in surfaces:
+		sf["defl"] = 0.0
+	wing_cl = saved_cl
+	return {"alpha": a, "drag": drag, "lift": lift_total, "cl": wing_cl, "stalled": a_hi >= 0.59}
+
+## Maximum lift coefficient of the whole airframe (lift / (q * ref_area)), swept in body alpha.
+func cl_max(flap := 0.0) -> float:
+	_set_elev(pitch_trim)
+	for sf in surfaces:
+		for m in sf["mix"]:
+			if int(m[0]) == 3:
+				sf["defl"] = float(sf["defl"]) + float(m[1]) * flap * float(max_defl[3])
+	var saved_cl := wing_cl
+	var best := 0.0
+	var v := 12.0
+	wing_cl = 0.5
+	for k in 60:
+		var a := deg_to_rad(-2.0 + 0.5 * k)
+		var v_l := Vector3(0, -sin(a), -cos(a)) * v
+		var res := _aero(v_l, Vector3.ZERO, Vector3.ZERO, Vector3.ZERO, 1.0, true)
+		var lift := (res[0] as Vector3).dot(Vector3(0, cos(a), -sin(a)))
+		best = maxf(best, lift / (0.5 * RHO * v * v * ref_area))
+	for sf in surfaces:
+		sf["defl"] = 0.0
+	wing_cl = saved_cl
+	return best
+
 # ================================================================ replay playback (visual only)
 func apply_replay(fa: Dictionary, fb: Dictionary, a: float, delta: float) -> void:
 	var xf := (fa["xf"] as Transform3D).interpolate_with(fb["xf"], a)
