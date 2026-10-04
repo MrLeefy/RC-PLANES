@@ -723,8 +723,7 @@ func _aero(v_l: Vector3, w_l: Vector3, wind_l: Vector3, wind_tip_l: Vector3, ge_
 			var ad := absf(dl)
 			var dd := float(c["tau"]) * float(c["frac"]) * float(s["health"]) * dl * (1.0 - 0.28 * minf(ad / 0.6, 1.0))
 			dal += dd
-			if s["is_flap"]:
-				dal_f += dd
+			dal_f += dd
 			cdc += 1.1 * float(c["frac"]) * float(c["cf"]) * sin(ad) * sin(ad)
 			cmc -= (0.15 + 0.35 * float(c["cf"])) * dd * float(p["cla"]) * (1.0 - float(c["cf"]))
 		area_f = maxf(area_f, 0.0)
@@ -739,9 +738,10 @@ func _aero(v_l: Vector3, w_l: Vector3, wind_l: Vector3, wind_tip_l: Vector3, ge_
 		var re_f := clampf(pow(3.0e5 / maxf(re, 2.0e4), 0.2), 0.82, 1.45)
 		var st := float(p["stall"]) - deg_to_rad(2.2) * clampf(log(3.0e5 / maxf(re, 2.0e4)) / 1.0986, -0.6, 1.0)
 		var a_eff := alpha - a0 + dal
-		# Flaps shift the lift curve up AND raise CL max: the stall angle only falls by ~40 % of the shift
-		# (a plain 40 degree flap adds ~0.8-1.0 CL max). Without this a flapped wing stalls EARLIER at the
-		# same CL max, i.e. flaps would raise the stall speed.
+		# A deflected plain flap/aileron/elevator shifts the lift curve AND raises CL max: the stall angle only
+		# moves by ~10 % of the geometric shift (a 40 degree flap adds ~0.8-1.0 CL max). Without this a flapped
+		# wing stalls EARLIER at the same CL max (flaps would raise the stall speed), and a down aileron would
+		# stall its tip first, so using ailerons at the stall made the wing drop WORSE.
 		var ap := st - a0 + 0.9 * maxf(dal_f, 0.0)
 		var an := st + a0 + 0.9 * maxf(-dal_f, 0.0)
 		var M := 28.0
@@ -838,6 +838,13 @@ func compute_factory_trim() -> void:
 			var f_e: Vector3 = (engines[ei] as Propulsion).dir * float(th["per"][ei])
 			mt += r_e.cross(f_e).x
 	_trim_extra_moment = mt
+	# slipstream over wing and tail at this power (momentum theory, as in the flight model) shifts the pitch trim
+	for ei in engines.size():
+		var en2: Propulsion = engines[ei]
+		if en2.is_prop() and ei < (th["per"] as Array).size():
+			var area := PI * en2.D * en2.D * 0.25
+			var vi := 0.5 * (-v_t + sqrt(v_t * v_t + 2.0 * maxf(float(th["per"][ei]), 0.0) / (RHO * area)))
+			en2.wash_v = vi * 1.7
 	lo = -0.6
 	hi = 0.6
 	for it in 22:
@@ -848,6 +855,8 @@ func compute_factory_trim() -> void:
 			lo = mid2
 		best = mid2
 	pitch_trim = clampf(best, -0.65, 0.65)
+	for en3 in engines:
+		(en3 as Propulsion).wash_v = 0.0
 	for ei in engines.size():
 		var e: Propulsion = engines[ei]
 		if not e.is_prop():
