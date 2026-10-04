@@ -419,7 +419,27 @@ func _wing_chord_frac(p: Vector3) -> float:
 	return clampf((p.z - zle) / c, 0.0, 1.0)
 
 func _pfn(zone: String) -> Callable:
-	return func(p: Vector3, n: Vector3) -> Color: return paint(zone, p, n)
+	return func(p: Vector3, n: Vector3, aa := false) -> Color:
+		return paint_aa(zone, p, n) if aa else paint(zone, p, n)
+
+## Anti-aliased livery: 5 taps on the surface tangent plane, averaged in linear space, so a
+## hard-edged stripe/camo boundary becomes a ~1 cm soft edge that the mesh refinement can resolve
+## as a clean line instead of vertex-quantised stair steps.
+func paint_aa(zone: String, p: Vector3, n: Vector3) -> Color:
+	if zone == "blade" or zone == "strut" or zone == "gear" or zone == "frame":
+		return paint(zone, p, n)
+	var r := clampf(length * 0.0016, 0.0022, 0.0045)
+	var t1 := n.cross(Vector3.UP)
+	if t1.length_squared() < 1e-4:
+		t1 = n.cross(Vector3.RIGHT)
+	t1 = t1.normalized() * r
+	var t2 := n.cross(t1).normalized() * r
+	var c0 := paint(zone, p, n) * 2.0
+	var c1 := paint(zone, p + t1, n)
+	var c2 := paint(zone, p - t1, n)
+	var c3 := paint(zone, p + t2, n)
+	var c4 := paint(zone, p - t2, n)
+	return (c0 + c1 + c2 + c3 + c4) / 6.0
 
 # ---------------------------------------------------------------- fuselage
 func _ring(z: float, segs: int, scale := 1.0) -> PackedVector3Array:
