@@ -206,7 +206,7 @@ const PRESETS := {
 	"midday": {"sun_el": 62.0, "sun_az": 160.0, "sun_col": Color(1.0, 0.97, 0.92), "sun_e": 3.0, "zen": Color(0.18, 0.40, 0.80), "hor": Color(0.68, 0.78, 0.9),
 		"ground": Color(0.32, 0.34, 0.3), "amb": 0.8, "fog": Color(0.72, 0.8, 0.9), "fog_d": 0.0011, "clouds": 0.42, "cloud_dark": 0.35, "exp": 0.92, "glow": 0.2, "lush": 0.9},
 	"golden": {"sun_el": 7.5, "sun_az": 252.0, "sun_col": Color(1.0, 0.72, 0.42), "sun_e": 2.5, "zen": Color(0.28, 0.42, 0.72), "hor": Color(0.98, 0.78, 0.55),
-		"ground": Color(0.3, 0.28, 0.22), "amb": 0.85, "fog": Color(0.92, 0.78, 0.62), "fog_d": 0.0016, "clouds": 0.4, "cloud_dark": 0.25, "exp": 1.05, "glow": 0.7, "lush": 1.0},
+		"ground": Color(0.3, 0.28, 0.22), "amb": 0.85, "fog": Color(0.92, 0.78, 0.62), "fog_d": 0.0012, "clouds": 0.4, "cloud_dark": 0.25, "exp": 1.05, "glow": 0.7, "lush": 1.0},
 	"overcast": {"sun_el": 40.0, "sun_az": 200.0, "sun_col": Color(0.85, 0.87, 0.9), "sun_e": 0.8, "zen": Color(0.55, 0.58, 0.62), "hor": Color(0.72, 0.74, 0.76),
 		"ground": Color(0.3, 0.31, 0.3), "amb": 1.25, "fog": Color(0.66, 0.68, 0.7), "fog_d": 0.0024, "clouds": 0.92, "cloud_dark": 0.55, "exp": 1.1, "glow": 0.0, "lush": 0.95},
 }

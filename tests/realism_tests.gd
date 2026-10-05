@@ -74,7 +74,9 @@ func t_spec_sheets() -> void:
 	_ok("specs: all 16 inside category RC envelopes (wing loading, T/W, Vs, CG)", bad_env.is_empty(), str(bad_env))
 	# scale-model fidelity: length/span of the replicas that copy a real type (published dimensions, +-8 %)
 	var real_ls := {"skylark": 7.31 / 10.17, "belle51": 9.83 / 11.28, "specter22": 18.9 / 13.56, "brute10": 16.26 / 17.53,
-		"striker16": 15.03 / 9.96, "macharrow": 61.66 / 25.6, "skyliner": 70.66 / 64.44, "cargo130": 29.79 / 40.41, "tundra_cub": 6.88 / 10.73}
+		"striker16": 15.03 / 9.96, "macharrow": 61.66 / 25.6, "skyliner": 70.66 / 64.44, "cargo130": 29.79 / 40.41, "tundra_cub": 6.88 / 10.73,
+		# class references for the in-the-style-of designs: 3D-aerobat (Extra-type), WWII radial fighter, light bush/trainer
+		"vortex540": 0.88, "aerostar": 0.93, "skipper": 0.90, "tiger28": 0.79, "ridgeline": 0.70, "valor": 0.80}
 	var bad_ratio := []
 	for id in real_ls:
 		var spr: Dictionary = specs[id]
