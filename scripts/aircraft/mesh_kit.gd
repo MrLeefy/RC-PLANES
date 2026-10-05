@@ -126,7 +126,7 @@ func _emit_grid(list: PackedInt32Array, base: int, cc: int, rsel: Array, csel: A
 ## (a stripe or camo edge crosses the triangle) the triangle is split into a small
 ## barycentric lattice and re-painted, so the edge resolves crisply instead of smearing or
 ## stair-stepping. Sub-vertices lie exactly on the parent triangle, so no cracks appear.
-const REFINE_DEPTH := 1   # 2 = second refinement level (costs ~2x triangles, not worth it on mobile)
+const REFINE_DEPTH := 1   # 2 = second refinement level (costs ~2x triangles for a marginal gain, not worth it on mobile)
 const REFINE_K := 4
 const REFINE_K2 := 3
 const REFINE_THRESHOLD := 0.06

@@ -376,14 +376,14 @@ func paint(zone: String, p: Vector3, n: Vector3) -> Color:
 					col = Color(0.05, 0.05, 0.05)
 		"cargo":
 			if zone == "fus":
-				if zf < 0.045: col = a1
+				if zf < 0.02: col = Color(0.3, 0.31, 0.32)
 				if absf(rel_y + 0.05) < 0.03 and zf > 0.1 and zf < 0.8: col = a2
 		"airliner":
 			if zone == "fus":
 				if rel_y < -0.25: col = Color(0.72, 0.74, 0.78)
 				if absf(rel_y + 0.05) < 0.09 and zf > 0.06: col = a1
 				if absf(rel_y + 0.18) < 0.03 and zf > 0.06: col = a2
-				if zf < 0.03: col = Color(0.25, 0.26, 0.28)
+				if zf < 0.016: col = Color(0.55, 0.56, 0.58)
 			elif zone == "fin":
 				col = a1
 				var sw := sin(p.z * 22.0 + p.y * 9.0)
@@ -1489,13 +1489,38 @@ func _build_fan(ec: int, e: Dictionary, eng: Dictionary, ei: int) -> void:
 				var rr := Vector3(fp[0] * 0.42, fp[1] * 0.62, 0.16)
 				if intake == "sides_single":
 					rr = Vector3(fp[0] * 0.3, fp[1] * 0.9, 0.2)
-				# half-bulge duct (only outer half visible, rest inside fuselage)
-				kit.add_ellipsoid(c, rr, 14, 8, _pfn("fus"))
-				var ring := PackedVector3Array()
-				for i in 14:
-					var a := TAU * i / 14.0
-					ring.append(c + Vector3(cos(a) * rr.x * 0.82, sin(a) * rr.y * 0.82, -rr.z * 0.6))
-				dk.add_cap(c + Vector3(0, 0, -rr.z * 0.6), ring, Vector3(0, 0, -1), dark)
+				# lofted cheek intake: a rounded-rectangular mouth that fairs smoothly back into the fuselage side
+				var z_in := c.z - rr.z
+				var len_in := rr.z * 2.9
+				var irows := []
+				var nl := 12 if lod_detail >= 1 else 6
+				for li in nl + 1:
+					var tl := float(li) / nl
+					var fade := smoothstep(0.15, 1.0, tl)
+					var zz := z_in + len_in * tl
+					var fpz := _fus_param(zz)
+					var ax: float = rr.x * (1.0 - 0.93 * pow(fade, 1.2))
+					var ay: float = rr.y * (1.0 - 0.80 * pow(fade, 1.2))
+					# the mouth slides outward a little, the duct sinks into the skin toward the rear
+					var cx: float = side * (float(fpz[0]) * (0.88 + 0.07 * (1.0 - fade)) + ax * 0.12)
+					var cy: float = float(fpz[2]) - float(fpz[1]) * 0.05
+					var iring := PackedVector3Array()
+					for k in 18:
+						var aa := TAU * float(k) / 18.0
+						var ca := cos(aa)
+						var sa := sin(aa)
+						iring.append(Vector3(cx + signf(ca) * pow(absf(ca), 0.7) * ax, cy + signf(sa) * pow(absf(sa), 0.7) * ay, zz))
+					irows.append(iring)
+				_grid_auto(kit, irows, true, _pfn("fus"))
+				var m_ring: PackedVector3Array = irows[0]
+				var m_c := _centroid(m_ring)
+				var dring := PackedVector3Array()
+				for q in m_ring:
+					dring.append(m_c + (q - m_c) * 0.84 + Vector3(0, 0, 0.006))
+				dk.add_cap(m_c + Vector3(0, 0, 0.006), dring, Vector3(0, 0, -1), dark)
+				# lip ring
+				for k in m_ring.size():
+					kit.add_cylinder(m_ring[k], m_ring[(k + 1) % m_ring.size()], 0.0016, 0.0016, 4, _pfn("fus"), false, true)
 		elif intake == "belly":
 			var c2 := Vector3(0, fp[2] - fp[1] * 0.95, iz + 0.25)
 			var rr2 := Vector3(fp[0] * 0.55, fp[1] * 0.45, 0.35)
@@ -1674,7 +1699,7 @@ func _build_wheel(wd: Dictionary, gi: int) -> void:
 			hk.add_cylinder(cc + Vector3(-w * 0.45, 0, 0), cc + Vector3(w * 0.45, 0, 0), r * 0.12, r * 0.12, 6, MeshKit.const_color(_lin(Color(0.3, 0.3, 0.3))), true, true)
 	if bool(wd["pants"]):
 		var pk := _kit(slider, "body")
-		pk.add_ellipsoid(c + Vector3(0, r * 0.2, r * 0.3), Vector3(w * 0.78, r * 0.84, r * 1.75), 18, 10, _pfn("pant"))
+		pk.add_ellipsoid(c + Vector3(0, r * 0.2, r * 0.45), Vector3(w * 0.9, r * 0.95, r * 2.15), 20, 10, _pfn("pant"))
 	var retract_axis := Vector3(0, 0, 1) * (-signf(c.x) if absf(c.x) > 0.001 else 1.0)
 	var retract_angle := deg_to_rad(88.0)
 	if absf(c.x) < 0.001:
@@ -1712,6 +1737,70 @@ func _build_details() -> void:
 	if bool(det.get("gun", false)):
 		var mk2 := _kit(_comp_part(core), "metalbare")
 		mk2.add_cylinder(Vector3(0, -0.02, -0.03), Vector3(0, -0.02, 0.02), 0.006, 0.006, 8, MeshKit.const_color(_lin(Color(0.2, 0.2, 0.2), 0.0)), true, true)
+	if det.has("lerx") and d["wings"].size() > 0:
+		# leading-edge root extension: a flat blended strake from the fuselage side forward of the wing root
+		var wl: Dictionary = d["wings"][0]
+		var lx: Dictionary = det["lerx"]
+		var zr: float = float(wl["z"])
+		var tsw: float = tan(deg_to_rad(float(wl["sweep"])))
+		var fb := _fus_param(zr + 0.2)
+		var zb: float = zr + float(fb[0]) * tsw
+		var z_a: float = zb - float(lx["len"])
+		var fa := _fus_param(z_a)
+		var yl: float = float(wl["y"]) + float(lx.get("dy", 0.0))
+		var th_l: float = 0.010 * length / 2.4
+		var lk := _kit(_comp_part(core), "body")
+		for side in [-1.0, 1.0]:
+			var pa := Vector3(side * float(fa[0]) * 0.97, yl, z_a)
+			var pb := Vector3(side * float(fb[0]) * 0.97, yl, zb)
+			var pc := Vector3(side * (float(fb[0]) + float(lx["width"])), yl, zr + (float(fb[0]) + float(lx["width"])) * tsw)
+			var up := Vector3(0, th_l, 0)
+			var col_l: Callable = _pfn("wing")
+			var fl: bool = side < 0.0
+			# top and bottom skins (slightly crowned), outer edge blended with a thin rim
+			var ca := pa + up * 0.2
+			var cb := pb + up
+			var cc := pc + up * 0.3
+			var da := pa - up * 0.2
+			var db := pb - up
+			var dc := pc - up * 0.3
+			if fl:
+				lk.add_triangle(ca, cb, cc, col_l.call(ca, Vector3.UP), false, Vector3.UP)
+				lk.add_triangle(da, dc, db, col_l.call(da, Vector3.DOWN), false, Vector3.DOWN)
+			else:
+				lk.add_triangle(ca, cc, cb, col_l.call(ca, Vector3.UP), false, Vector3.UP)
+				lk.add_triangle(da, db, dc, col_l.call(da, Vector3.DOWN), false, Vector3.DOWN)
+			lk.add_cylinder(ca, cc, th_l * 0.5, th_l * 0.5, 6, col_l, false, true)
+			lk.add_cylinder(cc, cb, th_l * 0.5, th_l * 0.5, 6, col_l, false, true)
+	if det.has("doors") and lod_detail >= 1:
+		# passenger / cargo door outlines on both sides of the fuselage
+		var dk3 := _kit(_comp_part(core), "cockpit")
+		var seam3 := MeshKit.const_color(Color(0.06, 0.06, 0.07))
+		for dz in det["doors"]:
+			var z0d := float(dz) * length
+			var fpd2 := _fus_param(z0d + 0.03)
+			for side in [-1.0, 1.0]:
+				var xx: float = side * float(fpd2[0]) * 1.0015
+				var yc2: float = float(fpd2[2]) + float(fpd2[1]) * 0.18
+				var hh2: float = float(fpd2[1]) * 0.42
+				var dw := 0.024 + float(fpd2[0]) * 0.12
+				var cs := [Vector3(xx, yc2 - hh2, z0d), Vector3(xx, yc2 - hh2, z0d + dw), Vector3(xx, yc2 + hh2, z0d + dw), Vector3(xx, yc2 + hh2, z0d)]
+				for i in 4:
+					dk3.add_cylinder(cs[i], cs[(i + 1) % 4], 0.0012, 0.0012, 4, seam3, false, true)
+	if bool(det.get("flap_tracks", false)) and d["wings"].size() > 0 and lod_detail >= 1:
+		# canoe fairings under the flaps: the signature bumps along a jet wing's trailing edge
+		var wf: Dictionary = d["wings"][0]
+		if (wf["flap"] as Array).size() >= 2:
+			var half_f := float(wf["span"]) * 0.5
+			var ft := _kit(_comp_part(core), "body")
+			for side in [-1.0, 1.0]:
+				for fs in [0.25, 0.42, 0.62, 0.78]:
+					var s_f: float = clampf(fs * float(wf["flap"][1]) / 0.6, 0.05, 0.95)
+					var xs: float = side * s_f * half_f
+					var chord: float = lerpf(float(wf["root"]), float(wf["tip"]), s_f)
+					var zte: float = float(wf["z"]) + absf(xs) * tan(deg_to_rad(float(wf["sweep"]))) + chord * 0.98
+					var yw: float = float(wf["y"]) + absf(xs) * tan(deg_to_rad(float(wf["dihedral"]))) - chord * float(wf["thick"]) * 0.42
+					ft.add_ellipsoid(Vector3(xs, yw, zte - chord * 0.06), Vector3(0.0075, 0.0065, chord * 0.20), 10, 6, _pfn("wing"))
 	if bool(det.get("belly_fairing", false)):
 		# wing-to-body fairing (airliners): a smooth lofted blister under the wing root
 		var w0: Dictionary = d["wings"][0]
@@ -1770,8 +1859,8 @@ func _build_details() -> void:
 				var host := core if z < z_split else tb
 				var wk := _kit(_comp_part(host), "cockpit")
 				var n := Vector3(side, 0, 0)
-				wk.add_quad(pz + Vector3(0, -0.005, -0.004), pz + Vector3(0, -0.005, 0.004), pz + Vector3(0, 0.005, 0.004), pz + Vector3(0, 0.005, -0.004), Color(0.03, 0.04, 0.06), true, n)
-			z += 0.019
+				wk.add_quad(pz + Vector3(0, -0.0062, -0.0048), pz + Vector3(0, -0.0062, 0.0048), pz + Vector3(0, 0.0062, 0.0048), pz + Vector3(0, 0.0062, -0.0048), Color(0.03, 0.04, 0.06), true, n)
+			z += 0.0205
 
 # ---------------------------------------------------------------- fuselage aero / drag
 var body_drag: Dictionary = {}

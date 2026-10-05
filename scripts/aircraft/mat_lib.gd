@@ -35,7 +35,7 @@ static func aircraft(kind: String) -> ShaderMaterial:
 	match kind:
 		"foam": rough = 0.69; bump = 0.12
 		"film": rough = 0.31; coat = 0.42; bump = 0.10
-		"composite": rough = 0.30; coat = 0.55
+		"composite": rough = 0.30; coat = 0.55; lines = 0.5
 		"carbon": rough = 0.3; coat = 0.6
 		"metal": rough = 0.25; lines = 0.8
 		"fabric": rough = 0.62

@@ -384,7 +384,7 @@ static func _build() -> Array:
 		"cg": 0.25, "rates": {"ail": 15.0, "elev": 14.0, "rud": 18.0, "flap": 0.0},
 		"livery": {"scheme": "grey2", "base": Color(0.56, 0.58, 0.60), "a1": Color(0.40, 0.42, 0.45), "a2": Color(0.2, 0.2, 0.22)},
 		"labels": [{"text": "SW 520", "z": 1.95, "y": 0.35, "size": 0.07, "color": Color(0.12, 0.12, 0.13), "vtail": true}],
-		"tank": 2.8, "fuel_type": "Kerosene", "body_cd": 0.07, "gear_drag": 0.02, "strength": 1.8, "servo_speed": 380.0,
+		"tank": 2.8, "fuel_type": "Kerosene", "body_cd": 0.07, "gear_drag": 0.02, "strength": 1.8, "servo_speed": 380.0, "details": {"lerx": {"len": 0.62, "width": 0.16}},
 	}))
 
 	# 12 ── EDF: Specter 22 (F-22 style twin 70 mm)
@@ -476,7 +476,7 @@ static func _build() -> Array:
 		"id": "skyliner", "name": "Skyliner 74", "category": "Airliner",
 		"blurb": "Jumbo-style four-engine airliner. Swept wing, upper deck hump, 18 wheels. Fly it like a big jet.",
 		"material": "composite", "mass": 4.9, "length": 2.15,
-		"fuselage": [[0.000, 0.012, 0.012, -0.012, 2.0], [0.057, 0.055, 0.06, -0.01, 2.0], [0.170, 0.086, 0.10, 0.004, 2.0], [0.362, 0.099, 0.128, 0.02, 2.0], [0.588, 0.102, 0.136, 0.024, 2.0], [0.883, 0.102, 0.118, 0.008, 2.0], [1.471, 0.102, 0.11, 0.0, 2.0], [1.788, 0.076, 0.08, 0.02, 2.0], [2.037, 0.034, 0.045, 0.04, 2.0], [2.150, 0.012, 0.02, 0.045, 2.0]],
+		"fuselage": [[0.000, 0.016, 0.016, -0.030, 2.0], [0.075, 0.050, 0.056, -0.022, 2.0], [0.200, 0.082, 0.096, -0.002, 2.0], [0.380, 0.098, 0.128, 0.018, 2.0], [0.588, 0.102, 0.136, 0.024, 2.0], [0.883, 0.102, 0.118, 0.008, 2.0], [1.471, 0.102, 0.11, 0.0, 2.0], [1.788, 0.076, 0.08, 0.02, 2.0], [2.037, 0.034, 0.045, 0.04, 2.0], [2.150, 0.012, 0.02, 0.045, 2.0]],
 		"canopy": {"z0": 0.11, "z1": 0.28, "hw": 0.06, "hh": 0.03, "y": 0.105, "style": "airliner", "tint": Color(0.05, 0.06, 0.08)},
 		"wings": [_wing(0.66, -0.07, 1.95, 0.52, 0.12, {"dihedral": 6.0, "incidence": 2.0, "washout": 2.0, "thick": 0.11,
 			"camber": 0.025, "ail": [0.62, 0.92, 0.22], "flap": [0.08, 0.58, 0.24], "sweep": 37.0, "tip_style": "winglet", "stall_deg": 15.0})],
@@ -498,7 +498,7 @@ static func _build() -> Array:
 		"labels": [{"text": "SKYLINER", "z": 0.52, "y": 0.07, "size": 0.045, "color": Color(0.07, 0.2, 0.62)},
 			{"text": "74", "z": 1.84, "y": 0.34, "size": 0.08, "color": Color(0.97, 0.97, 0.98), "vtail": true}],
 		"batteries": [_batt("2x 4S 3300 mAh (parallel)", 4, 6.6, 0.74), _batt("2x 4S 4000 mAh (parallel)", 4, 8.0, 0.86)],
-		"body_cd": 0.08, "gear_drag": 0.02, "strength": 1.0, "details": {"windows": true, "hump": true, "belly_fairing": true},
+		"body_cd": 0.08, "gear_drag": 0.02, "strength": 1.0, "details": {"windows": true, "hump": true, "belly_fairing": true, "flap_tracks": true, "doors": [0.14, 0.30, 0.58, 0.80]},
 	}))
 
 	# 16 ── SST: Mach Arrow (Concorde-style delta, elevons, 4 EDF)

@@ -38,8 +38,6 @@ void fragment() {
 		float w = n3(opos * vec3(9.0, 40.0, 9.0));
 		g = vec3(w - 0.5, 0.0, n3(opos * 11.0) - 0.5) * bump * 0.35;
 		r = rough + (w - 0.5) * 0.06;
-	} else if (kind == 2) {
-		r = rough;
 	} else if (kind == 3) {
 		vec2 w = UV * 140.0;
 		float weave = 1.0 - smoothstep(0.25, 0.8, max(fwidth(w.x), fwidth(w.y)));
@@ -48,7 +46,7 @@ void fragment() {
 		float tow = sin(fract(hor ? w.x : w.y) * 3.14159);
 		base = mix(vec3(0.032,0.034,0.039), mix(vec3(0.012, 0.013, 0.015), vec3(0.06, 0.062, 0.068), tow * (hor ? 1.0 : 0.6)), weave);
 		r = 0.35 + (0.07 - 0.14 * tow) * weave;
-	} else if (kind == 4 || kind == 8) {
+	} else if (kind == 4 || kind == 8 || kind == 2) {
 		// panels: oil-canned brightness variation + seams + rivets
 		vec3 q = opos * vec3(8.0, 9.0, 6.5);
 		vec3 cid = floor(q);

@@ -29,6 +29,16 @@ Date: 2026-09-26 · Build: 0.9.0 (versionCode 9) · Godot 4.7.2 stable · Jolt �
 - Device testing: the cloud environment has no KVM, emulator or system images, so no Android run was possible.
 - Not done: device testing; notch/cutout inset tests.
 
+### Model realism pass (2026-10-05, after on-phone feedback "models look like trash")
+- Viper 90: cheek intakes are now lofted ducts that fade into the fuselage instead of ellipsoid pods stuck on the side.
+- Airliner/cargo noses: oversized black radome caps reduced to a small tip; Skyliner nose reshaped (longer, tapered, drooped).
+- Skyliner: larger passenger windows, door outlines, flap-track canoe fairings, belly fairing; composite skins now carry panel seams and rivets (shader).
+- Cargomaster: rear ramp outline and paratroop-door seams; gear sponsons against the fuselage.
+- Striker 16: leading-edge root extensions (LERX) that blend into the wing leading edge.
+- Wheel spats are teardrops sized to the wheel instead of balloons.
+- Tried a second paint-edge refinement level: doubled triangles for a marginal gain, reverted.
+- Still rough: stair-stepped livery stripe edges on some fuselages (vertex-colour paint), blurry decals at close range, simple pilot figures, no cockpit interiors beyond a pilot and tub.
+
 ## Automated suite (`-- --test`): 28 / 28 PASS
 - **PASS** transmitter: Linear preset is exactly linear
 - **PASS** transmitter: expo softens centre
