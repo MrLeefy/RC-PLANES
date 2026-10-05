@@ -14,6 +14,13 @@ Date: 2026-09-26 · Build: 0.9.0 (versionCode 9) · Godot 4.7.2 stable · Jolt �
 - APK: `build/RCPark-debug.apk` re-exported and signed with apksigner (28.99 MB). Not installed on a device.
 - Not measured here: Android frame rate, thermals, audio latency, touch feel. Software-rendered screenshots only.
 
+### Follow-up (2026-10-05)
+- `-- --upgrade-test` 248 / 248 (two consecutive runs); `tests/flight_test.tscn` clean.
+- Airliner flight-deck glazing, C-130 / 747 / Super Cub proportions (length/span test against published dimensions), 747 wing-body belly fairing, C-130 rear ramp and paratroop-door seams.
+- Camera: chase/orbit distances already scale with span and length and use a ray plus a sphere sweep for collision avoidance; no change needed.
+- Aspect-ratio QA (lavapipe, game booted, Skyliner on the runway): 2400x1080 (20:9), 1920x1200 (16:10) and 1600x1200 (4:3). HUD, side buttons and both sticks stay on screen and clear of the edges. Simulated notch/cutout insets were not tested.
+- Not done: terrain/vegetation/sky upgrades; device testing.
+
 ## Automated suite (`-- --test`): 28 / 28 PASS
 - **PASS** transmitter: Linear preset is exactly linear
 - **PASS** transmitter: expo softens centre

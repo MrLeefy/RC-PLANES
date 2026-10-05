@@ -1702,6 +1702,54 @@ func _build_details() -> void:
 	if bool(det.get("gun", false)):
 		var mk2 := _kit(_comp_part(core), "metalbare")
 		mk2.add_cylinder(Vector3(0, -0.02, -0.03), Vector3(0, -0.02, 0.02), 0.006, 0.006, 8, MeshKit.const_color(_lin(Color(0.2, 0.2, 0.2), 0.0)), true, true)
+	if bool(det.get("belly_fairing", false)):
+		# wing-to-body fairing (airliners): a smooth lofted blister under the wing root
+		var w0: Dictionary = d["wings"][0]
+		var wzc := float(w0["z"]) + float(w0["root"]) * 0.42
+		var fpb := _fus_param(wzc)
+		ck.add_ellipsoid(Vector3(0, float(fpb[2]) - float(fpb[1]) * 0.80, wzc), Vector3(float(fpb[0]) * 1.02, float(fpb[1]) * 0.30, float(w0["root"]) * 0.62), 16, 8, _pfn("fus"))
+	if det.has("ramp") and lod_detail >= 1:
+		# rear cargo ramp / door outline and paratroop doors, as dark panel seams on the skin
+		var rz: Array = det["ramp"]
+		var sk := _kit(_comp_part(core), "cockpit")
+		var seam := MeshKit.const_color(Color(0.05, 0.05, 0.06))
+		var th2 := 0.0011
+		var steps := 8
+		for side in [-1.0, 1.0]:
+			var prev := Vector3.ZERO
+			for i in steps + 1:
+				var zz := lerpf(float(rz[0]), float(rz[1]), float(i) / steps)
+				var fpr := _fus_param(zz)
+				var ang := deg_to_rad(-90.0 + side * 38.0)
+				var e := 2.0 / maxf(float(fpr[3]), 1.0)
+				var pr := Vector3(signf(cos(ang)) * pow(absf(cos(ang)), e) * float(fpr[0]) * 1.002, signf(sin(ang)) * pow(absf(sin(ang)), e) * float(fpr[1]) + float(fpr[2]), zz)
+				if i > 0:
+					sk.add_cylinder(prev, pr, th2, th2, 4, seam, false, true)
+				prev = pr
+		for zz in [float(rz[0]), float(rz[1])]:
+			var fpr2 := _fus_param(zz)
+			var e2 := 2.0 / maxf(float(fpr2[3]), 1.0)
+			var prev2 := Vector3.ZERO
+			for i in 7:
+				var ang2 := deg_to_rad(-90.0 - 38.0 + 76.0 * float(i) / 6.0)
+				var pr2 := Vector3(signf(cos(ang2)) * pow(absf(cos(ang2)), e2) * float(fpr2[0]) * 1.002, signf(sin(ang2)) * pow(absf(sin(ang2)), e2) * float(fpr2[1]) + float(fpr2[2]), zz)
+				if i > 0:
+					sk.add_cylinder(prev2, pr2, th2, th2, 4, seam, false, true)
+				prev2 = pr2
+		# paratroop doors
+		var pz0 := float(rz[0]) - 0.16
+		var fpd := _fus_param(pz0 + 0.05)
+		for side in [-1.0, 1.0]:
+			var x: float = side * (float(fpd[0]) * 1.002)
+			var yc: float = float(fpd[2]) + float(fpd[1]) * 0.1
+			var c1 := Vector3(x, yc - 0.035, pz0)
+			var c2 := Vector3(x, yc - 0.035, pz0 + 0.1)
+			var c3 := Vector3(x, yc + 0.04, pz0 + 0.1)
+			var c4 := Vector3(x, yc + 0.04, pz0)
+			sk.add_cylinder(c1, c2, th2, th2, 4, seam, false, true)
+			sk.add_cylinder(c2, c3, th2, th2, 4, seam, false, true)
+			sk.add_cylinder(c3, c4, th2, th2, 4, seam, false, true)
+			sk.add_cylinder(c4, c1, th2, th2, 4, seam, false, true)
 	if bool(det.get("windows", false)) and lod_detail >= 1:
 		var tb := int(cidx["tail_boom"])
 		var z := length * 0.12

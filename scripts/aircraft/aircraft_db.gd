@@ -472,7 +472,7 @@ static func _build() -> Array:
 			{"text": "7315", "z": 1.45, "y": 0.28, "size": 0.05, "color": Color(0.12, 0.12, 0.13), "vtail": true}],
 		"batteries": [_batt("2x 4S 4000 mAh (parallel)", 4, 8.0, 0.86), _batt("2x 4S 5000 mAh (parallel)", 4, 10.0, 1.02)],
 		"props": [_prop("9 x 6 (4-blade)", 9, 6, 4), _prop("10 x 5 (3-blade)", 10, 5, 3)],
-		"body_cd": 0.20, "gear_drag": 0.015, "strength": 1.2,
+		"body_cd": 0.20, "gear_drag": 0.015, "strength": 1.2, "details": {"ramp": [1.02, 1.36]},
 	}))
 
 	# 15 ── Airliner: Skyliner 74 (747 style, 4 x 50 mm EDF)
@@ -502,7 +502,7 @@ static func _build() -> Array:
 		"labels": [{"text": "SKYLINER", "z": 0.52, "y": 0.07, "size": 0.045, "color": Color(0.07, 0.2, 0.62)},
 			{"text": "74", "z": 1.84, "y": 0.34, "size": 0.08, "color": Color(0.97, 0.97, 0.98), "vtail": true}],
 		"batteries": [_batt("2x 4S 3300 mAh (parallel)", 4, 6.6, 0.74), _batt("2x 4S 4000 mAh (parallel)", 4, 8.0, 0.86)],
-		"body_cd": 0.08, "gear_drag": 0.02, "strength": 1.0, "details": {"windows": true, "hump": true},
+		"body_cd": 0.08, "gear_drag": 0.02, "strength": 1.0, "details": {"windows": true, "hump": true, "belly_fairing": true},
 	}))
 
 	# 16 ── SST: Mach Arrow (Concorde-style delta, elevons, 4 EDF)
