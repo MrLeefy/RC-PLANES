@@ -13,6 +13,8 @@ uniform vec4 grass_rwy = vec4(-80.0, -30.0, 80.0, -14.0);
 uniform vec4 gravel_rect = vec4(-52.0, 44.0, 32.0, 72.0);
 uniform vec4 pits_rect = vec4(-47.0, 19.0, 32.0, 41.0);
 uniform float lushness = 1.0;
+uniform vec2 cloud_shift = vec2(0.0);
+uniform float cloud_shadow = 0.0;
 varying vec3 wpos;
 
 float rmask(vec2 p, vec4 r, float soft) {
@@ -75,6 +77,9 @@ void fragment() {
 	float clump = n2(p * 1.35 + 4.2) * 0.6 + n2(p * 4.7) * 0.4;
 	float lawn = 1.0 - gr - pathm;
 	col *= mix(1.0, (0.84 + 0.32 * bl) * (0.9 + 0.2 * clump), blade_fade * clamp(lawn, 0.0, 1.0) * (1.0 - farmzone));
+	// drifting cloud shadows: large soft patches that move with the sky's clouds
+	float cs = smoothstep(0.50, 0.72, fbm2(p * 0.0042 + cloud_shift));
+	col *= 1.0 - cs * cloud_shadow * (1.0 - smoothstep(500.0, 1600.0, dist) * 0.6);
 	ALBEDO = col;
 	ROUGHNESS = 0.96;
 	SPECULAR = 0.25;

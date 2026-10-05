@@ -240,6 +240,7 @@ func set_time_of_day(preset: String) -> void:
 	env.glow_intensity = float(p["glow"]) * 0.6
 	if terrain_mat:
 		terrain_mat.set_shader_parameter("lushness", p["lush"])
+		terrain_mat.set_shader_parameter("cloud_shadow", clampf(float(p["clouds"]) * 0.32, 0.0, 0.3))
 
 func apply_quality(q: String) -> void:
 	quality = q
@@ -1329,5 +1330,7 @@ func _process(delta: float) -> void:
 		if _cloud_t > 0.2:
 			_cloud_t = 0.0
 			sky_mat.set_shader_parameter("cloud_offset", cloud_off)
+			if terrain_mat:
+				terrain_mat.set_shader_parameter("cloud_shift", cloud_off * 420.0)
 
 var _cloud_t := 0.0

@@ -24,6 +24,8 @@ Date: 2026-09-26 · Build: 0.9.0 (versionCode 9) · Godot 4.7.2 stable · Jolt �
 - Runway shader already models rubber, patches, cracks and edge wear; not changed.
 - Mach Arrow now has a curved ogival wing leading edge (new `ogive` wing option, straight trailing edge). Default-quality grass instances raised 50 % (ultra 2.2x), software-render primitive count in the flight view rose from about 303k to 393k; no device frame-rate measured. Stall test now treats a steady mush that reaches the ground as the "mushed" outcome.
 - Sky: added a thin high cirrus layer (checked looking up at midday; subtle, no artefacts). Terrain shader already has farmland patches, mowing stripes, hedges, wear and gravel, so it was not changed.
+- Terrain: drifting cloud shadows (soft patches moving with the sky clouds, scaled by cloud cover), checked in a midday aerial render.
+- APK static checks (apksigner / aapt2): signature verifies with v2 and v3 schemes, package com.rcpark.sim.upgrade versionCode 10, target SDK 36, arm64-v8a native libraries only, Vulkan feature declared, 28.99 MB. This is a static check only; the APK has not been installed.
 - Device testing: the cloud environment has no KVM, emulator or system images, so no Android run was possible.
 - Not done: device testing; notch/cutout inset tests.
 
