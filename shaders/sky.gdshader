@@ -41,6 +41,11 @@ void sky() {
 			cc += sun_tint * pow(sdot, 12.0) * (1.0 - thick) * 0.8;
 			float fadeh = smoothstep(-0.02, 0.18, d.y);
 			col = mix(col, cc, cov * fadeh);
+			// high thin cirrus: streaks stretched along the wind, lit toward the sun, fading at the horizon
+			vec2 uvc = d.xz / (d.y + 0.32) * 0.42 + cloud_offset * 0.35;
+			float ci = fbm2(vec2(uvc.x * 0.6, uvc.y * 3.2));
+			float cirrus = smoothstep(0.52, 0.86, ci) * smoothstep(0.03, 0.30, d.y) * (0.55 - 0.35 * cloud_cov);
+			col = mix(col, mix(cloud_col, sun_tint, 0.35) * (0.9 + 0.5 * pow(sdot, 6.0)), cirrus * (1.0 - cov * 0.8));
 		}
 	} else {
 		col += sun_tint * pow(sdot, 32.0) * 0.4 * glow;

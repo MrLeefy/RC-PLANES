@@ -23,7 +23,9 @@ Date: 2026-09-26 · Build: 0.9.0 (versionCode 9) · Godot 4.7.2 stable · Jolt �
 - Mach Arrow droop nose, Skyliner exhaust core plugs and thinner pylons (rendered and inspected). New test: HUD buttons stay inside simulated cutouts at 2400x1080 (side and top/bottom insets), 1920x1200, 1600x1200 and 2960x1344 (249 / 249).
 - Runway shader already models rubber, patches, cracks and edge wear; not changed.
 - Mach Arrow now has a curved ogival wing leading edge (new `ogive` wing option, straight trailing edge). Default-quality grass instances raised 50 % (ultra 2.2x), software-render primitive count in the flight view rose from about 303k to 393k; no device frame-rate measured. Stall test now treats a steady mush that reaches the ground as the "mushed" outcome.
-- Not done: terrain/sky redesign; device testing; notch/cutout inset tests.
+- Sky: added a thin high cirrus layer (checked looking up at midday; subtle, no artefacts). Terrain shader already has farmland patches, mowing stripes, hedges, wear and gravel, so it was not changed.
+- Device testing: the cloud environment has no KVM, emulator or system images, so no Android run was possible.
+- Not done: device testing; notch/cutout inset tests.
 
 ## Automated suite (`-- --test`): 28 / 28 PASS
 - **PASS** transmitter: Linear preset is exactly linear
