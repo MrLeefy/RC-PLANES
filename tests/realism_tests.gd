@@ -483,6 +483,8 @@ func _stall(a: Aircraft, id: String, sp: Dictionary) -> Dictionary:
 				sw += float(p_["area"])
 		m["sig"] = sa / maxf(sw, 1e-4)
 		# tip-stall dominated wings (wing rock, parachuting descent at full back stick) never separate >50 % of the area
+		if a.agl < 1.5 or a.wheels_touching > 0:   # a steady mush that reaches the ground is the 'mushed' outcome, not a stall break
+			break
 		var lost_hold: bool = m["pitch_in"] > 0.99 and m["sig"] > 0.15 and (h_hold - a.global_position.y) > 6.0 and a.linear_velocity.y < -2.0
 		if (m["sig"] > 0.5 or lost_hold) and a.g_load > 0.6:   # a stall in the unloaded top of a zoom is not a 1 g stall
 			m["broke"] = true

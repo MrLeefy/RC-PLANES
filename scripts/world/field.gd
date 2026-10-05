@@ -283,7 +283,7 @@ func apply_quality(q: String) -> void:
 	env.glow_enabled = float(p["glow"]) > 0.05 and q != "performance"
 	env.glow_intensity = float(p["glow"]) * 0.6
 	var density := clampf(float(Settings.g("graphics", "grass", 1.0)), 0.0, 2.0)
-	var quality_density := 0.4 if q == "performance" else (1.6 if q == "ultra" else 1.0)
+	var quality_density := 0.4 if q == "performance" else (2.2 if q == "ultra" else 1.5)
 	for g in grass_nodes:
 		var mm: MultiMesh = (g as MultiMeshInstance3D).multimesh
 		mm.visible_instance_count = clampi(roundi(mm.instance_count * density * quality_density / 3.2), 0, mm.instance_count)

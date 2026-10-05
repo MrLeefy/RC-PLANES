@@ -690,6 +690,12 @@ func _sp(sf: Dictionary, s: float, u: float, upper: float) -> Vector3:
 	var L := s * float(sf["half"])
 	var c := lerpf(float(sf["rc"]), float(sf["tc"]), s)
 	var zle := L * float(sf["tan_sw"])
+	var og := float(sf.get("og", 0.0))
+	if og > 0.0:
+		# ogival planform: the leading edge curves (steeper near the root) while the trailing edge stays straight
+		var bulge := og * float(sf["half"]) * s * (1.0 - s)
+		zle += bulge
+		c = maxf(c - bulge, 0.02)
 	var af := _airfoil(u, float(sf["t"]), float(sf["m"]))
 	var h := (af.x + upper * af.y) * c
 	var a := (u - 0.25) * c
@@ -868,6 +874,7 @@ func _build_wing(w: Dictionary, wi: int) -> void:
 		var thick_dir := Vector3(-side * sin(dih), cos(dih), 0.0)
 		var root_pt := Vector3(0, float(w["y"]), float(w["z"]))
 		var sf := _surf(root_pt, span_dir, thick_dir, half, rc, tc, sw, float(w["thick"]), float(w["camber"]), inc, inc - wash)
+		sf["og"] = float(w.get("ogive", 0.0))
 		var inner := _add_comp("wing%d_%s" % [wi, sname], core, "wing", 1.0)
 		var tip := _add_comp("tip%d_%s" % [wi, sname], inner, "wingtip", 0.85)
 		comps[inner]["center"] = _sp(sf, split * 0.5, 0.4, 0.0)

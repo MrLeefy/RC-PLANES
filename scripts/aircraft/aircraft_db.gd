@@ -511,7 +511,7 @@ static func _build() -> Array:
 			[2.05, 0.012, 0.03, 0.02, 2.0]],
 		"canopy": {"z0": 0.22, "z1": 0.36, "hw": 0.045, "hh": 0.02, "y": 0.052, "style": "airliner", "tint": Color(0.05, 0.06, 0.08)},
 		"wings": [_wing(0.78, -0.05, 0.92, 1.05, 0.06, {"dihedral": 0.0, "incidence": 3.0, "washout": 0.0, "thick": 0.035,
-			"camber": 0.0, "ail": [0.12, 0.92, 0.3], "flap": [], "sweep": 58.0, "tip_style": "square", "elevon": true, "stall_deg": 32.0, "x0": 0.06})],
+			"camber": 0.0, "ail": [0.12, 0.92, 0.3], "flap": [], "sweep": 58.0, "tip_style": "square", "elevon": true, "stall_deg": 32.0, "x0": 0.06, "ogive": 0.45})],
 		"htail": {},
 		"vtails": [_vtail(1.45, 0.07, 0.34, 0.52, 0.14, {"sweep": 55.0, "rudder_cf": 0.3})],
 		"engines": [

@@ -40,7 +40,7 @@ simulation's own geometry and models** by `scripts/aircraft/aircraft_specs.gd` (
 | Brute 10 | EDF Jet | 1.45 | 1.30 | 35 | 245 | 6.0 | 3.74 | 107 | 26 | 26 | 15 |
 | Cargomaster 130 | Multi-engine | 2.05 | 1.60 | 43 | 214 | 9.8 | 4.86 | 113 | 25 | 64 | 0 |
 | Skyliner 74 | Airliner | 1.95 | 2.15 | 62 | 362 | 6.1 | 5.64 | 90 | 24 | 27 | 0 |
-| Mach Arrow SST | Airliner | 0.92 | 2.05 | 51 | 702 | 1.7 | 4.46 | 87 | 17 | 6 | 0 |
+| Mach Arrow SST | Airliner | 0.92 | 2.05 | 51 | 702 | 1.7 | 4.46 | 87 | 17 | 10 | 0 |
 
 | Aircraft | Power | Static thrust N | T/W | W/kg | Vs clean | Vs flaps | Vapp | Vcruise | Vtop | ROC m/s | Takeoff roll m | Endurance cruise min |
 |---|---|---|---|---|---|---|---|---|---|---|---|---|
@@ -59,7 +59,7 @@ simulation's own geometry and models** by `scripts/aircraft/aircraft_specs.gd` (
 | Brute 10 | 2526 W in x2 | 31.8 | 0.87 | 676 | 12.8 | 10.9 | 14.2 | 22.7 | 31.7 | 7.4 | 19 | 5.3 |
 | Cargomaster 130 | 1248 W in x4 | 53.4 | 1.12 | 257 | 12.1 | 10.3 | 13.4 | 12.4 | 27.0 | 7.7 | 15 | 15.9 |
 | Skyliner 74 | 2138 W in x4 | 46.9 | 0.85 | 379 | 11.6 | 9.6 | 12.5 | 22.5 | 31.4 | 7.0 | 16 | 5.6 |
-| Mach Arrow SST | 2675 W in x4 | 44.5 | 1.02 | 600 | 10.9 | 10.9 | 14.2 | 25.0 | 36.0 | 7.7 | 11 | 5.4 |
+| Mach Arrow SST | 2675 W in x4 | 44.5 | 1.02 | 600 | 11.1 | 11.1 | 14.4 | 24.4 | 35.2 | 7.6 | 11 | 5.4 |
 
 ## Scale fidelity
 
