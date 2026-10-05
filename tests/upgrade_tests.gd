@@ -137,6 +137,25 @@ func t_touch_and_safe_area() -> void:
 	gesture.hide()
 	_ok("orbit: hidden view releases every pointer", gesture.points.is_empty())
 	gesture.queue_free()
+	# simulated cutouts: every HUD button must stay inside the safe area at phone and tablet aspect ratios
+	var hud_ok := true
+	var hud_bad := []
+	for case in [[Vector2(2400, 1080), Rect2(132, 0, 2136, 1080)], [Vector2(2400, 1080), Rect2(0, 60, 2400, 960)], [Vector2(1920, 1200), Rect2(0, 0, 1920, 1200)],
+			[Vector2(1600, 1200), Rect2(40, 30, 1520, 1140)], [Vector2(2960, 1344), Rect2(148, 0, 2664, 1344)]]:
+		var hud := HUD.new()
+		hud.size = case[0]
+		get_parent().ui.add_child(hud)
+		hud.size = case[0]
+		UITheme.safe_area_override = case[1]
+		hud._layout()
+		for n in hud.btn:
+			var b: Control = hud.btn[n]
+			if b.visible and not (case[1] as Rect2).grow(0.5).encloses(Rect2(b.position, b.size)):
+				hud_ok = false
+				hud_bad.append("%s %s in %s" % [n, str(Rect2(b.position, b.size)), str(case[1])])
+		UITheme.safe_area_override = Rect2()
+		hud.queue_free()
+	_ok("UI: HUD buttons stay inside simulated cutouts at 20:9, 16:10, 4:3 and 2.2:1", hud_ok, str(hud_bad))
 	var area := UITheme.scale_safe_area(Vector2(1600,740), Vector2(2400,1080), Rect2(120,0,2280,990))
 	_ok("UI: safe area converts both axes independently", is_equal_approx(area.position.x, 80) and is_equal_approx(area.end.x,1600) and absf(area.end.y - 678.333333) < 0.01, str(area))
 	await _frames(2)

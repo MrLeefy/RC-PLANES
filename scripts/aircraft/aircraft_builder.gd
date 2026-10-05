@@ -1411,20 +1411,23 @@ func _build_nacelle(nc: int, e: Dictionary, nac: Dictionary, is_prop: bool) -> v
 			dk2.add_cap(pos + Vector3(0, 0, L - 0.004), ring2, Vector3(0, 0, 1), MeshKit.const_color(Color(0.02, 0.02, 0.02)))
 			# inner lip (dark tube)
 			dk2.add_cylinder(pos + Vector3(0, 0, -0.001), pos + Vector3(0, 0, 0.012), r * 0.9, r * 0.86, 16, MeshKit.const_color(Color(0.05, 0.05, 0.05)), false)
+			# turbofan core: tapered exhaust plug behind the nozzle
+			if lod_detail >= 1 and bool(nac.get("pylon", false)):
+				dk2.add_lathe([Vector2(0.0, r * 0.46), Vector2(L * 0.06, r * 0.42), Vector2(L * 0.2, r * 0.22), Vector2(L * 0.3, 0.0004)], pos + Vector3(0, 0, L - 0.004), Basis(), 12, MeshKit.const_color(Color(0.3, 0.3, 0.32)))
 	if bool(nac.get("pylon", false)):
 		var wing_y := float(d["wings"][0]["y"]) + absf(pos.x) * tan(deg_to_rad(float(d["wings"][0]["dihedral"])))
 		var top := pos + Vector3(0, r * 0.8, L * 0.35)
 		var h := wing_y - top.y
 		# swept, lens-section pylon lofted from the nacelle up into the wing
 		var prows := []
-		var chord_lo := L * 0.55
-		var chord_hi := L * 0.9
+		var chord_lo := L * 0.5
+		var chord_hi := L * 0.8
 		for pi in 6:
 			var tt := float(pi) / 5.0
 			var yy := lerpf(top.y - r * 0.4, top.y + h + 0.004, tt)
 			var cc := lerpf(chord_lo, chord_hi, tt)
 			var zle := pos.z + L * 0.12 - 0.06 * tt
-			var th := lerpf(0.011, 0.008, tt)
+			var th := lerpf(0.008, 0.006, tt)
 			var pring := PackedVector3Array()
 			for k in 12:
 				var a := TAU * float(k) / 12.0

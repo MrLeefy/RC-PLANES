@@ -506,7 +506,7 @@ static func _build() -> Array:
 		"id": "macharrow", "name": "Mach Arrow SST", "category": "Airliner",
 		"blurb": "Slender delta supersonic-transport replica. Elevons, high-alpha landings, needs power on final.",
 		"material": "composite", "mass": 3.6, "length": 2.05,
-		"fuselage": [[0.0, 0.003, 0.003, -0.02, 2.0], [0.15, 0.035, 0.035, -0.008, 2.0], [0.35, 0.06, 0.065, 0.0, 2.0],
+		"fuselage": [[0.0, 0.003, 0.003, -0.045, 2.0], [0.15, 0.035, 0.035, -0.028, 2.0], [0.35, 0.06, 0.065, -0.004, 2.0],
 			[0.60, 0.07, 0.075, 0.0, 2.0], [1.50, 0.07, 0.075, 0.0, 2.0], [1.85, 0.05, 0.06, 0.01, 2.0],
 			[2.05, 0.012, 0.03, 0.02, 2.0]],
 		"canopy": {"z0": 0.22, "z1": 0.36, "hw": 0.045, "hh": 0.02, "y": 0.052, "style": "airliner", "tint": Color(0.05, 0.06, 0.08)},

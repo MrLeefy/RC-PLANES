@@ -20,7 +20,9 @@ Date: 2026-09-26 · Build: 0.9.0 (versionCode 9) · Godot 4.7.2 stable · Jolt �
 - Camera: chase/orbit distances already scale with span and length and use a ray plus a sphere sweep for collision avoidance; no change needed.
 - Aspect-ratio QA (lavapipe, game booted, Skyliner on the runway): 2400x1080 (20:9), 1920x1200 (16:10) and 1600x1200 (4:3). HUD, side buttons and both sticks stay on screen and clear of the edges. Simulated notch/cutout insets were not tested.
 - Vortex 540 and Tiger 28 bodies shortened to class proportions; golden-hour fog lightened (0.0016 to 0.0012). Midday and golden-hour renders inspected (lavapipe).
-- Not done: terrain/vegetation/sky redesign; device testing; notch/cutout inset tests.
+- Mach Arrow droop nose, Skyliner exhaust core plugs and thinner pylons (rendered and inspected). New test: HUD buttons stay inside simulated cutouts at 2400x1080 (side and top/bottom insets), 1920x1200, 1600x1200 and 2960x1344 (249 / 249).
+- Runway shader already models rubber, patches, cracks and edge wear; not changed.
+- Not done: Mach Arrow ogival (curved) wing leading edge; terrain/vegetation/sky redesign; device testing; notch/cutout inset tests.
 
 ## Automated suite (`-- --test`): 28 / 28 PASS
 - **PASS** transmitter: Linear preset is exactly linear

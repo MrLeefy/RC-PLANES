@@ -154,7 +154,12 @@ static func scale_safe_area(viewport_size: Vector2, window_size: Vector2, physic
 	var safe := Rect2(physical_safe.position * scale, physical_safe.size * scale).intersection(bounds)
 	return safe if safe.size.x > 0.0 and safe.size.y > 0.0 else bounds
 
+## Test hook: when set, replaces the platform safe area (simulated notches / cutouts / gesture bars).
+static var safe_area_override := Rect2()
+
 static func safe_area(control: Control) -> Rect2:
+	if safe_area_override.size.x > 0.0:
+		return safe_area_override.intersection(Rect2(Vector2.ZERO, control.size))
 	# Desktop safe areas refer to the screen, not a window placed on that screen.
 	# Android/iOS use the full immersive window and report cutouts/system insets.
 	if OS.get_name() not in ["Android", "iOS"]:
