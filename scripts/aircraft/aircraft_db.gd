@@ -505,10 +505,10 @@ static func _build() -> Array:
 		"htail": {},
 		"vtails": [_vtail(1.45, 0.07, 0.34, 0.52, 0.14, {"sweep": 55.0, "rudder_cf": 0.3})],
 		"engines": [
-			_edf(Vector3(-0.22, -0.10, 1.55), 64.0, 10.5, 48.0, 38.0, 0.2, {"intake": "box", "nacelle": {"len": 0.40, "r": 0.04, "box": true}}),
-			_edf(Vector3(-0.13, -0.10, 1.55), 64.0, 10.5, 48.0, 38.0, 0.2, {"intake": "box", "nacelle": {"len": 0.40, "r": 0.04, "box": true}}),
-			_edf(Vector3(0.13, -0.10, 1.55), 64.0, 10.5, 48.0, 38.0, 0.2, {"intake": "box", "nacelle": {"len": 0.40, "r": 0.04, "box": true}, "spin": -1}),
-			_edf(Vector3(0.22, -0.10, 1.55), 64.0, 10.5, 48.0, 38.0, 0.2, {"intake": "box", "nacelle": {"len": 0.40, "r": 0.04, "box": true}, "spin": -1})],
+			_edf(Vector3(-0.209, -0.10, 1.55), 64.0, 10.5, 48.0, 38.0, 0.2, {"intake": "box", "nacelle": {"len": 0.40, "r": 0.04, "box": true}}),
+			_edf(Vector3(-0.158, -0.10, 1.55), 64.0, 10.5, 48.0, 38.0, 0.2, {"intake": "box", "nacelle": {"len": 0.40, "r": 0.04, "box": true}}),
+			_edf(Vector3(0.158, -0.10, 1.55), 64.0, 10.5, 48.0, 38.0, 0.2, {"intake": "box", "nacelle": {"len": 0.40, "r": 0.04, "box": true}, "spin": -1}),
+			_edf(Vector3(0.209, -0.10, 1.55), 64.0, 10.5, 48.0, 38.0, 0.2, {"intake": "box", "nacelle": {"len": 0.40, "r": 0.04, "box": true}, "spin": -1})],
 		"gear": {"type": "tricycle", "retract": true, "wheels": [
 			_wheel(0, -0.26, 0.45, 0.026, {"len": 0.20, "steer": true, "style": "oleo", "brake": false, "twin": true}),
 			_wheel(-0.16, -0.25, 1.18, 0.032, {"len": 0.19, "style": "bogie"}),

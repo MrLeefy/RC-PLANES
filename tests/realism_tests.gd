@@ -293,6 +293,21 @@ func t_spec_sheets() -> void:
 		if e > float(side_max[id]):
 			side_bad.append("%s side RMS %.1f %% > %.1f" % [id, e, side_max[id]])
 	_ok("scale: side-view upper contour matches the real type's drawing (RMS % of length)", side_bad.is_empty(), str(side_bad) + " | " + ", ".join(side_txt))
+	# engine lateral stations as a fraction of the semi-span, read off the real types' front/top view drawings
+	var eng_ref := {"skyliner": [0.365, 0.63], "macharrow": [0.34, 0.46]}
+	var eng_bad := []
+	for id in eng_ref:
+		var de := AircraftDB.by_id(id)
+		var half: float = float(de["wings"][0]["span"]) * 0.5
+		var xs := []
+		for e in de["engines"]:
+			xs.append(absf((e["pos"] as Vector3).x) / half)
+		xs.sort()
+		var inner: float = float(xs[0])
+		var outer: float = float(xs[xs.size() - 1])
+		if absf(inner - float(eng_ref[id][0])) > 0.05 or absf(outer - float(eng_ref[id][1])) > 0.05:
+			eng_bad.append("%s engines at %.2f/%.2f of semispan, real %.2f/%.2f" % [id, inner, outer, eng_ref[id][0], eng_ref[id][1]])
+	_ok("scale: 747 and Concorde engine stations match the real drawings (+-0.05 semi-span)", eng_bad.is_empty(), str(eng_bad))
 	_ok("scale: aspect ratio of the replicas matches the real types within 12 %", bad_ar.is_empty(), str(bad_ar))
 	_ok("scale: length/span of the replicas matches the real types within 8 %", bad_ratio.is_empty(), str(bad_ratio))
 	_ok("specs: mass book-keeping adds up and inertia is physical", bad_mass.is_empty(), str(bad_mass))
