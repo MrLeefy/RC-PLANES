@@ -72,6 +72,7 @@ func build(def: Dictionary, config: Dictionary, detail := 2) -> Dictionary:
 		_build_wheel(wdef, gi)
 		gi += 1
 	_build_details()
+	_build_detail_pack()
 	_build_body_panels()
 	_assign_masses()
 	_build_shapes()
@@ -1700,6 +1701,18 @@ func _build_wheel(wd: Dictionary, gi: int) -> void:
 		hk.add_cylinder(cc + Vector3(-w * 0.36, 0, 0), cc + Vector3(w * 0.36, 0, 0), (r - w * 0.5) * 0.95, (r - w * 0.5) * 0.95, 12 if lod_detail >= 1 else 6, hcol)
 		if lod_detail >= 2:
 			hk.add_cylinder(cc + Vector3(-w * 0.45, 0, 0), cc + Vector3(w * 0.45, 0, 0), r * 0.12, r * 0.12, 6, MeshKit.const_color(_lin(Color(0.3, 0.3, 0.3))), true, true)
+		if lod_detail >= 1:
+			# wheel spokes (a dished hub with dark cut-outs), a brake disc inboard and an axle nut outboard
+			var side_o: float = -1.0 if c.x >= 0.0 else 1.0
+			var hr: float = (r - w * 0.5) * 0.95
+			var dk_h := MeshKit.const_color(_lin(Color(0.07, 0.07, 0.08)))
+			for sp_i in 5:
+				var sa: float = TAU * float(sp_i) / 5.0
+				var p1: Vector3 = cc + Vector3(side_o * w * 0.38, cos(sa) * hr * 0.28, sin(sa) * hr * 0.28)
+				var p2: Vector3 = cc + Vector3(side_o * w * 0.38, cos(sa) * hr * 0.86, sin(sa) * hr * 0.86)
+				hk.add_cylinder(p1, p2, hr * 0.07, hr * 0.07, 4, dk_h, false, true)
+			hk.add_cylinder(cc + Vector3(-side_o * w * 0.30, 0, 0), cc + Vector3(-side_o * w * 0.36, 0, 0), hr * 0.62, hr * 0.62, 14, MeshKit.const_color(_lin(Color(0.45, 0.45, 0.48))), true, true)
+			hk.add_cylinder(cc + Vector3(side_o * w * 0.46, 0, 0), cc + Vector3(side_o * w * 0.56, 0, 0), hr * 0.16, hr * 0.16, 6, MeshKit.const_color(_lin(Color(0.55, 0.55, 0.58))), true, true)
 	if bool(wd["pants"]):
 		var pk := _kit(slider, "body")
 		pk.add_ellipsoid(c + Vector3(0, r * 0.1, r * 0.35), Vector3(w * 0.78, r * 0.80, r * 1.9), 20, 10, _pfn("pant"))
@@ -1943,6 +1956,126 @@ func _build_details() -> void:
 					var nu := Vector3(side, 0.25, 0).normalized()
 					wku.add_quad(pu + Vector3(0, -0.0045, -0.0036), pu + Vector3(0, -0.0045, 0.0036), pu + Vector3(0, 0.0045, 0.0036), pu + Vector3(0, 0.0045, -0.0036), Color(0.03, 0.04, 0.06), true, nu)
 				zu += 0.0185
+
+# ---------------------------------------------------------------- detail pack (fleet-wide small parts)
+## Small real-aircraft details added to every model at medium/high detail: cockpit interior, cowl fasteners, exhausts,
+## pitot tubes, wing hatches and control horns, jet nose booms, intake lips. All are tiny parts on existing components.
+func _build_detail_pack() -> void:
+	if lod_detail < 1:
+		return
+	var core := int(cidx["fuselage"])
+	var fk := _kit(_comp_part(core), "body")
+	var dk := _kit(_comp_part(core), "cockpit")
+	var mk2 := _kit(_comp_part(core), "metalbare")
+	var etype := String(d["engines"][0]["type"])
+	var prop_nose: bool = z_nose > 0.0
+	var jet: bool = etype in ["edf", "turbine"]
+	var dark := MeshKit.const_color(Color(0.03, 0.03, 0.035))
+	var steel := MeshKit.const_color(_lin(Color(0.55, 0.56, 0.6), 0.0))
+	var cn: Dictionary = d["canopy"]
+	# ---- cockpit interior: instrument panel, seat back, stick and a tinted floor
+	if not cn.is_empty() and String(cn.get("style", "")) != "airliner":
+		var cz0: float = float(cn["z0"])
+		var cz1: float = float(cn["z1"])
+		var cy: float = float(cn["y"])
+		var chw: float = float(cn["hw"])
+		var panel_z: float = cz0 + (cz1 - cz0) * 0.12
+		var fpp := _fus_param(panel_z)
+		var pw: float = minf(chw, float(fpp[0])) * 0.78
+		dk.add_box(Transform3D(Basis().scaled(Vector3(pw, 0.012 + chw * 0.1, 0.004)), Vector3(0, cy + 0.012, panel_z)), Color(0.04, 0.04, 0.045))
+		for gi in 3:
+			var gx: float = (float(gi) - 1.0) * pw * 0.5
+			fk.add_ellipsoid(Vector3(gx, cy + 0.016, panel_z - 0.003), Vector3(pw * 0.14, pw * 0.14, 0.0015), 8, 4, MeshKit.const_color(_lin(Color(0.85, 0.85, 0.8))), Basis(), true)
+		var seat_z: float = cz0 + (cz1 - cz0) * 0.62
+		dk.add_box(Transform3D(Basis().scaled(Vector3(pw * 0.55, 0.02 + chw * 0.18, 0.005)), Vector3(0, cy + 0.018, seat_z + 0.02)), Color(0.08, 0.07, 0.07))
+		dk.add_box(Transform3D(Basis().scaled(Vector3(pw * 0.55, 0.004, 0.02 + chw * 0.2)), Vector3(0, cy - 0.002, seat_z - 0.005)), Color(0.08, 0.07, 0.07))
+		mk2.add_cylinder(Vector3(0, cy - 0.002, seat_z - 0.04), Vector3(0, cy + 0.03 + chw * 0.15, seat_z - 0.05), 0.0016, 0.0016, 5, steel, false, true)
+		mk2.add_ellipsoid(Vector3(0, cy + 0.032 + chw * 0.15, seat_z - 0.05), Vector3(0.004, 0.004, 0.004), 6, 4, steel, Basis(), true)
+	# ---- propeller aircraft: cowl fasteners, intake, exhaust
+	if prop_nose:
+		var fpn := _fus_param(z_nose)
+		var hwn: float = float(fpn[0])
+		var hhn: float = float(fpn[1])
+		var ycn: float = float(fpn[2])
+		for ci in 14:
+			var ca: float = TAU * float(ci) / 14.0
+			var sx: float = cos(ca) * hwn * 1.0
+			var sy: float = ycn + sin(ca) * hhn * 1.0
+			mk2.add_cylinder(Vector3(sx, sy, z_nose - 0.004), Vector3(sx * 1.01, ycn + (sy - ycn) * 1.01, z_nose + 0.001), 0.0022, 0.0022, 5, steel, true, true)
+		# front of the cowl: a dark intake ring around the spinner backplate, with the engine's cooling fins and cylinder visible behind it
+		var z_front: float = float(d["fuselage"][0][0])
+		var fpf := _fus_param(z_front)
+		var r_out: float = minf(float(fpf[0]), float(fpf[1])) * 0.86
+		var spr: float = float(d["engines"][0].get("spinner_r", 0.03)) * 1.25
+		var ring_o := PackedVector3Array()
+		for ri in 20:
+			var ra: float = TAU * float(ri) / 20.0
+			ring_o.append(Vector3(cos(ra) * r_out, float(fpf[2]) + sin(ra) * r_out, z_front - 0.0008))
+		dk.add_cap(Vector3(0, float(fpf[2]), z_front - 0.0008), ring_o, Vector3(0, 0, -1), MeshKit.const_color(Color(0.015, 0.015, 0.018)))
+		var eng_col := MeshKit.const_color(_lin(Color(0.35, 0.36, 0.4), 0.0))
+		var etp0 := String(d["engines"][0]["type"])
+		if etp0 in ["glow2", "glow4", "gas2"]:
+			mk2.add_cylinder(Vector3(0, float(fpf[2]), z_front + 0.004), Vector3(0, float(fpf[2]), z_front + 0.05), r_out * 0.5, r_out * 0.5, 14, eng_col, true, true)
+			for fi in 6:
+				var fz: float = z_front + 0.008 + float(fi) * 0.006
+				mk2.add_cylinder(Vector3(0, float(fpf[2]), fz), Vector3(0, float(fpf[2]), fz + 0.0025), r_out * 0.62, r_out * 0.62, 14, MeshKit.const_color(_lin(Color(0.42, 0.43, 0.47), 0.0)), true, true)
+		else:
+			mk2.add_cylinder(Vector3(0, float(fpf[2]), z_front + 0.004), Vector3(0, float(fpf[2]), z_front + 0.04), r_out * 0.55, r_out * 0.55, 14, MeshKit.const_color(_lin(Color(0.12, 0.12, 0.14), 0.0)), true, true)
+			for bi in 6:
+				var ba: float = TAU * float(bi) / 6.0
+				mk2.add_cylinder(Vector3(cos(ba) * r_out * 0.66, float(fpf[2]) + sin(ba) * r_out * 0.66, z_front + 0.004), Vector3(cos(ba) * r_out * 0.66, float(fpf[2]) + sin(ba) * r_out * 0.66, z_front + 0.035), r_out * 0.05, r_out * 0.05, 5, eng_col, true, true)
+		var etp := String(d["engines"][0]["type"])
+		if etp in ["glow2", "glow4", "gas2"]:
+			# silencer / exhaust pipe running back along the lower left of the cowl
+			var ex0 := Vector3(-hwn * 0.82, ycn - hhn * 0.35, z_nose * 0.6)
+			var ex1 := Vector3(-hwn * 1.04, ycn - hhn * 0.55, z_nose + length * 0.08)
+			mk2.add_cylinder(ex0, ex1, 0.007 + length * 0.002, 0.009 + length * 0.002, 8, MeshKit.const_color(_lin(Color(0.28, 0.28, 0.3), 0.0)), true, true)
+			mk2.add_cylinder(ex1, ex1 + Vector3(0, -0.01, length * 0.03), 0.0045, 0.0045, 6, dark, true, true)
+		else:
+			# motor cooling slots under the cowl
+			for vi in 4:
+				var vz: float = z_nose * (0.35 + 0.12 * float(vi))
+				dk.add_box(Transform3D(Basis().scaled(Vector3(hwn * 0.5, 0.0012, 0.004)), Vector3(0, ycn - hhn * 0.97, vz)), Color(0.02, 0.02, 0.02))
+	# ---- pitot tubes: nose boom on jets, under-wing tube on propeller aircraft
+	if jet:
+		var tipz: float = float(d["fuselage"][0][0])
+		var fp0 := _fus_param(tipz)
+		mk2.add_cylinder(Vector3(0, float(fp0[2]), tipz), Vector3(0, float(fp0[2]), tipz - length * 0.035), 0.0016, 0.0009, 5, steel, true, true)
+	elif d["wings"].size() > 0 and not bool(String(d["id"]) in ["skipper"]):
+		var w0: Dictionary = d["wings"][0]
+		var half: float = float(w0["span"]) * 0.5
+		var px: float = -half * 0.42
+		var ple: float = float(w0["z"]) + absf(px) * tan(deg_to_rad(float(w0["sweep"])))
+		var py: float = float(w0["y"]) + absf(px) * tan(deg_to_rad(float(w0["dihedral"]))) - 0.012
+		var wk := _kit(_comp_part(_find_wing_comp(px)), "metalbare")
+		wk.add_cylinder(Vector3(px, py, ple + 0.01), Vector3(px, py, ple - 0.05), 0.0016, 0.0010, 5, steel, true, true)
+		wk.add_cylinder(Vector3(px, py, ple + 0.01), Vector3(px, py + 0.012, ple + 0.012), 0.0012, 0.0012, 4, steel, true, true)
+	# ---- under-wing servo hatches (rectangular covers) and control horns
+	if d["wings"].size() > 0:
+		var wa: Dictionary = d["wings"][0]
+		var ail: Array = wa["ail"]
+		var halfa: float = float(wa["span"]) * 0.5
+		var s_mid: float = (float(ail[0]) + float(ail[1])) * 0.5 if ail.size() >= 2 else 0.6
+		for side in [-1.0, 1.0]:
+			var hx: float = side * halfa * s_mid * 0.72
+			var chord: float = lerpf(float(wa["root"]), float(wa["tip"]), s_mid * 0.72)
+			var hle: float = float(wa["z"]) + absf(hx) * tan(deg_to_rad(float(wa["sweep"])))
+			var hy: float = float(wa["y"]) + absf(hx) * tan(deg_to_rad(float(wa["dihedral"]))) - chord * float(wa["thick"]) * 0.46
+			var hk2 := _kit(_comp_part(_find_wing_comp(hx)), "cockpit")
+			hk2.add_box(Transform3D(Basis().scaled(Vector3(0.022, 0.0012, 0.032)), Vector3(hx, hy, hle + chord * 0.58)), Color(0.18, 0.18, 0.2))
+			var hk3 := _kit(_comp_part(_find_wing_comp(hx)), "metalbare")
+			hk3.add_cylinder(Vector3(hx, hy, hle + chord * 0.78), Vector3(hx, hy - 0.016, hle + chord * 0.8), 0.0012, 0.0012, 4, steel, true, true)
+	# ---- jets: intake-lip ring on cheek/belly intakes is built with the intake; add nozzle petals
+	if jet and String(d["engines"][0].get("intake", "")) in ["sides", "belly", "sides_single"]:
+		var tz: float = float(d["fuselage"][d["fuselage"].size() - 1][0])
+		var tfp := _fus_param(tz)
+		var nr: float = minf(float(tfp[0]), float(tfp[1])) * 0.95
+		var tbk := _kit(_comp_part(int(cidx["tail_boom"])), "metalbare")
+		for ni in 12:
+			var na: float = TAU * float(ni) / 12.0
+			var pa := Vector3(cos(na) * nr * 0.95, float(tfp[2]) + sin(na) * nr * 0.95, tz - 0.004)
+			var pb := Vector3(cos(na) * nr * 0.8, float(tfp[2]) + sin(na) * nr * 0.8, tz + 0.03)
+			tbk.add_cylinder(pa, pb, 0.0045, 0.0028, 4, MeshKit.const_color(_lin(Color(0.3, 0.28, 0.26), 0.0)), false, true)
 
 # ---------------------------------------------------------------- fuselage aero / drag
 var body_drag: Dictionary = {}

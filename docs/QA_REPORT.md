@@ -85,6 +85,11 @@ Date: 2026-09-26 · Build: 0.9.0 (versionCode 9) · Godot 4.7.2 stable · Jolt �
 - Engine stations (read off the real front/top drawings, +-0.05 of semi-span, tested): 747 engines at 0.365/0.63 of semi-span (model already matched), Concorde engine pairs at about 0.34/0.46 (model moved inward from 0.28/0.48).
 - Limits: the side fit covers only the upper contour (gear, props, nacelles and the belly line were excluded because they distort the silhouette), fin shape only through the fuselage-plus-fin outline, and no front-view fit exists. F-22 chined nose, Concorde nacelles and wing kink, 747 pylons and A-10 tail shape were not matched by measurement.
 
+### Detail pass (2026-10-06, after "blocky and minimal" feedback)
+- I judged the worst offenders by close-up renders of all 16: bare cowl fronts, featureless wheels, empty cockpits, plain wings, tubular A-10. Fleet-wide fixes (new `_build_detail_pack`): dark cowl opening with engine/cylinder or motor cooling slots; cowl fasteners; glow/gas silencer pipes; motor cooling vents under electric cowls; wheel spokes, brake discs and axle nuts; cockpit instrument panel with dials, seat back/base and a stick; pitot tubes (nose boom on jets, under-wing on props); servo hatches and control horns under the ailerons; EDF/turbine nozzle petals. Brute 10 additionally got underwing tanks, flap-track fairings.
+- Cost: fleet triangles 991k -> 1.01M (+2 %).
+- Not done: no change to the overall shape of Viper 90 (smooth blob fuselage), no wing-root fillets, no riveted panel layout on foam/film models, and the engines hidden behind the cowl cap are not visible from outside. Judged from software-rendered close-ups only.
+
 ## Automated suite (`-- --test`): 28 / 28 PASS
 - **PASS** transmitter: Linear preset is exactly linear
 - **PASS** transmitter: expo softens centre

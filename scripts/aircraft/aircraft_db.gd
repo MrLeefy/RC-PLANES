@@ -429,7 +429,7 @@ static func _build() -> Array:
 		"labels": [{"text": "FT 104", "z": 1.16, "y": 0.13, "size": 0.045, "color": Color(0.12, 0.12, 0.13), "vtail": true}],
 		"batteries": [_batt("6S 5000 mAh", 6, 5.0, 0.72), _batt("6S 4000 mAh", 6, 4.0, 0.60)],
 		"body_cd": 0.14, "gear_drag": 0.03, "strength": 1.6,
-		"details": {"sharkmouth": true, "gun": true},
+		"details": {"sharkmouth": true, "gun": true, "wing_tanks": [0.38, 0.62], "flap_tracks": true},
 	}))
 
 	# 14 ── Multi-engine: Cargomaster 130 (C-130 style, 4 electric props)
