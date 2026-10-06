@@ -231,8 +231,9 @@ func paint(zone: String, p: Vector3, n: Vector3) -> Color:
 				col = a1
 		"cub":
 			if zone == "fus":
-				var zig := 0.12 * sin(zf * 30.0)
-				if absf(rel_y - 0.15 - zig) < 0.11 and zf > 0.15 and zf < 0.95: col = a1
+				# straight cheat-line like the real Cub's: a wide black band with a thin white pinstripe under it
+				if absf(rel_y - 0.12) < 0.12 and zf > 0.12 and zf < 0.97: col = a1
+				elif absf(rel_y + 0.05) < 0.03 and zf > 0.12 and zf < 0.97: col = a2
 				if zf < 0.09: col = a1
 			elif zone == "wing":
 				if s > 0.92: col = a1
@@ -1929,6 +1930,17 @@ func _build_details() -> void:
 				var n := Vector3(side, 0, 0)
 				wk.add_quad(pz + Vector3(0, -0.0062, -0.0048), pz + Vector3(0, -0.0062, 0.0048), pz + Vector3(0, 0.0062, 0.0048), pz + Vector3(0, 0.0062, -0.0048), Color(0.03, 0.04, 0.06), true, n)
 			z += 0.0205
+		if bool(det.get("hump", false)):
+			# upper-deck window row along the hump (747): a second, higher row over the forward fuselage
+			var zu := length * 0.13
+			while zu < length * 0.30:
+				var fpu := _fus_param(zu)
+				for side in [-1, 1]:
+					var pu := Vector3(side * (fpu[0] * 0.985), fpu[2] + fpu[1] * 0.62, zu)
+					var wku := _kit(_comp_part(core), "cockpit")
+					var nu := Vector3(side, 0.25, 0).normalized()
+					wku.add_quad(pu + Vector3(0, -0.0045, -0.0036), pu + Vector3(0, -0.0045, 0.0036), pu + Vector3(0, 0.0045, 0.0036), pu + Vector3(0, 0.0045, -0.0036), Color(0.03, 0.04, 0.06), true, nu)
+				zu += 0.0185
 
 # ---------------------------------------------------------------- fuselage aero / drag
 var body_drag: Dictionary = {}
@@ -2352,13 +2364,14 @@ func _place_labels() -> void:
 func _label(text: String, size: float, colr: Color) -> Label3D:
 	var l := Label3D.new()
 	l.text = text
-	l.font_size = 160
+	l.font_size = 256
 	l.outline_size = 0
-	l.pixel_size = size / 160.0
+	l.pixel_size = size / 256.0
 	l.modulate = colr
 	l.shaded = true
 	l.double_sided = false
-	l.alpha_cut = Label3D.ALPHA_CUT_DISCARD
+	l.alpha_cut = Label3D.ALPHA_CUT_OPAQUE_PREPASS
+	l.alpha_antialiasing_mode = BaseMaterial3D.ALPHA_ANTIALIASING_ALPHA_TO_COVERAGE
 	l.texture_filter = BaseMaterial3D.TEXTURE_FILTER_LINEAR_WITH_MIPMAPS
 	l.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	return l

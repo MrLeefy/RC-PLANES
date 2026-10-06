@@ -172,6 +172,19 @@ func t_spec_sheets() -> void:
 		var got_ar := float(spa["aspect_ratio"])
 		if absf(got_ar / float(real_ar[id]) - 1.0) > 0.12:
 			bad_ar.append("%s AR %.2f vs real %.2f" % [id, got_ar, real_ar[id]])
+	# signature layout counts taken from the real types
+	var layout_bad := []
+	var want := {"brute10": [2, 2], "specter22": [2, 2], "macharrow": [1, 4], "skyliner": [1, 4], "cargo130": [1, 4], "striker16": [1, 1]}   # [fins, engines]
+	for id in want:
+		var dd := AircraftDB.by_id(id)
+		var fins := 0
+		for v in dd["vtails"]:
+			fins += 2 if bool(v.get("mirror", false)) else 1
+		if fins != int(want[id][0]):
+			layout_bad.append("%s fins %d" % [id, fins])
+		if (dd["engines"] as Array).size() != int(want[id][1]):
+			layout_bad.append("%s engines %d" % [id, (dd["engines"] as Array).size()])
+	_ok("scale: A-10 twin fins, F-22 twin canted fins, Concorde/747/C-130 four engines, F-16 single fin and engine", layout_bad.is_empty(), str(layout_bad))
 	_ok("scale: aspect ratio of the replicas matches the real types within 12 %", bad_ar.is_empty(), str(bad_ar))
 	_ok("scale: length/span of the replicas matches the real types within 8 %", bad_ratio.is_empty(), str(bad_ratio))
 	_ok("specs: mass book-keeping adds up and inertia is physical", bad_mass.is_empty(), str(bad_mass))

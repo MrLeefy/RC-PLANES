@@ -55,6 +55,15 @@ Date: 2026-09-26 · Build: 0.9.0 (versionCode 9) · Godot 4.7.2 stable · Jolt �
 - NOT fixed: stair-stepped livery stripe edges. Raising the fuselage row count 110 to 190 (+27 % triangles) and ring segments made no visible difference, because the steps come from the per-vertex paint function itself; a shader-side stripe mask would be needed. Decals are still blurry up close.
 - Needs the user's phone: frame rate, thermals, touch feel, audio latency.
 
+### Reference pass 3 (2026-10-06): livery edges
+- Root cause of the stair-stepped / dashed stripes: (a) thin bands narrower than a triangle between three identically coloured corners vanished (dashed stripe); (b) the paint-edge lattice was too coarse (K=4).
+- Fix: refinement now also probes the centroid and edge midpoints, and the lattice is K=6 on High/Ultra (K=4 on Performance, via `MeshKit.refine_k` set from the graphics quality). Stripes on Skylark, Cub and Belle 51 now render continuous and crisp in turntable renders. The Super Cub's zig-zag stripe was replaced by a straight cheat line plus pinstripe (the real Cub has none).
+- Cost (measured with tests/tri_count.gd): fleet total 853k -> 1.43M triangles (+68 %), per aircraft about 52k -> 90k (Skylark). This is OVER the 15 % budget I set; only one aircraft is on screen at a time, but the cost on a real phone is unmeasured.
+- Decals: Label3D now 256 px with alpha-to-coverage and opaque prepass (crisper edges); not verified up close on a device.
+- 747: second window row along the upper-deck hump. New test "scale: A-10 twin fins, F-22 twin canted fins, Concorde/747/C-130 four engines, F-16 single fin and engine".
+- Still NOT matched to references: F-22 chined nose, Concorde wing kink and nacelle shape, 747 engine/pylon shape, A-10 tail shape (compared by eye; no measured outline fit).
+- 253 / 253 tests on two consecutive runs; flight bench clean; import clean.
+
 ## Automated suite (`-- --test`): 28 / 28 PASS
 - **PASS** transmitter: Linear preset is exactly linear
 - **PASS** transmitter: expo softens centre

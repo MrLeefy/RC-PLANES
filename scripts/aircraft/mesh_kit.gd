@@ -127,7 +127,8 @@ func _emit_grid(list: PackedInt32Array, base: int, cc: int, rsel: Array, csel: A
 ## barycentric lattice and re-painted, so the edge resolves crisply instead of smearing or
 ## stair-stepping. Sub-vertices lie exactly on the parent triangle, so no cracks appear.
 const REFINE_DEPTH := 1   # 2 = second refinement level (costs ~2x triangles for a marginal gain, not worth it on mobile)
-const REFINE_K := 4
+## Paint-edge lattice size: 4 on Performance, 6 on High/Ultra (set from the graphics quality; one aircraft is on screen at a time).
+static var refine_k := 6
 const REFINE_K2 := 3
 const REFINE_THRESHOLD := 0.06
 const REFINE_THRESHOLD2 := 0.30
@@ -149,10 +150,26 @@ func _refine(list: PackedInt32Array, a: int, b: int, c: int, refine_fn: Callable
 	var cb := cols[b]
 	var cc2 := cols[c]
 	var thr := REFINE_THRESHOLD if depth >= REFINE_DEPTH else REFINE_THRESHOLD2
-	if depth <= 0 or maxf(_col_dist(ca, cb), maxf(_col_dist(cb, cc2), _col_dist(ca, cc2))) < thr:
+	if depth <= 0:
 		_tri(list, a, b, c)
 		return
-	var k := REFINE_K if depth >= REFINE_DEPTH else REFINE_K2
+	var corner_d := maxf(_col_dist(ca, cb), maxf(_col_dist(cb, cc2), _col_dist(ca, cc2)))
+	if corner_d < thr:
+		# A band narrower than the triangle can lie between three identical corners and would vanish (dashed stripes).
+		# Probe the centroid and edge midpoints; if any differs from the corners, refine anyway.
+		var hit := false
+		if depth >= REFINE_DEPTH:
+			var probes := [(verts[a] + verts[b] + verts[c]) / 3.0, (verts[a] + verts[b]) * 0.5, (verts[b] + verts[c]) * 0.5, (verts[a] + verts[c]) * 0.5]
+			var nn := ((norms[a] + norms[b] + norms[c]) / 3.0).normalized()
+			for q in probes:
+				var pc2: Color = refine_fn.call(q, nn)
+				if _col_dist(pc2, ca) >= thr * 2.0:
+					hit = true
+					break
+		if not hit:
+			_tri(list, a, b, c)
+			return
+	var k := refine_k if depth >= REFINE_DEPTH else REFINE_K2
 	var grid := {}
 	for i in range(k + 1):
 		for j in range(k + 1 - i):
