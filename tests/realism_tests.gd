@@ -127,6 +127,18 @@ func t_spec_sheets() -> void:
 		var got := float(spr["length_m"]) / float(spr["span_m"])
 		if absf(got / float(real_ls[id]) - 1.0) > 0.08:
 			bad_ratio.append("%s L/b %.2f vs real %.2f" % [id, got, real_ls[id]])
+	# aspect ratio (span^2 / planform area) against published span and wing area, within 12 % (the RC replicas are not
+	# built to the real wing area: fuselage lift, thickness and servo-friendly chords move it a little)
+	var real_ar := {"skylark": 10.17 * 10.17 / 14.9, "tundra_cub": 10.73 * 10.73 / 16.6, "belle51": 11.28 * 11.28 / 21.83,
+		"specter22": 13.56 * 13.56 / 78.04, "brute10": 17.53 * 17.53 / 47.0, "striker16": 9.96 * 9.96 / 27.87,
+		"macharrow": 25.6 * 25.6 / 358.25, "skyliner": 64.4 * 64.4 / 541.0, "cargo130": 40.41 * 40.41 / 162.1}
+	var bad_ar := []
+	for id in real_ar:
+		var spa: Dictionary = specs[id]
+		var got_ar := float(spa["aspect_ratio"])
+		if absf(got_ar / float(real_ar[id]) - 1.0) > 0.12:
+			bad_ar.append("%s AR %.2f vs real %.2f" % [id, got_ar, real_ar[id]])
+	_ok("scale: aspect ratio of the replicas matches the real types within 12 %", bad_ar.is_empty(), str(bad_ar))
 	_ok("scale: length/span of the replicas matches the real types within 8 %", bad_ratio.is_empty(), str(bad_ratio))
 	_ok("specs: mass book-keeping adds up and inertia is physical", bad_mass.is_empty(), str(bad_mass))
 	_ok("specs: no hidden lead - ballast <= 3 % of ready mass everywhere", worst_ballast <= 0.03, "worst %.1f %%" % (worst_ballast * 100.0))
