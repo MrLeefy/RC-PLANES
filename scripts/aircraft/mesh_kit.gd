@@ -128,7 +128,7 @@ func _emit_grid(list: PackedInt32Array, base: int, cc: int, rsel: Array, csel: A
 ## stair-stepping. Sub-vertices lie exactly on the parent triangle, so no cracks appear.
 const REFINE_DEPTH := 1   # 2 = second refinement level (costs ~2x triangles for a marginal gain, not worth it on mobile)
 ## Paint-edge lattice size: 4 on Performance, 6 on High/Ultra (set from the graphics quality; one aircraft is on screen at a time).
-static var refine_k := 6
+static var refine_k := 5
 const REFINE_K2 := 3
 const REFINE_THRESHOLD := 0.06
 const REFINE_THRESHOLD2 := 0.30

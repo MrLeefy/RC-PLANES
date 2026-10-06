@@ -18,6 +18,7 @@ var cfg: Dictionary
 var lv: Dictionary
 var scheme := ""
 var mk := "foam"
+static var livery_quality := 1   # set from the graphics quality (see Field.apply_quality)
 var lod_detail := 2   # 2 = full detail, 1 = medium (parked display), 0 = low
 var comps: Array = []
 var cidx: Dictionary = {}
@@ -467,8 +468,9 @@ func _build_fuselage() -> void:
 	var z0 := float(st[0][0])
 	var z1 := float(st[st.size() - 1][0])
 	# Livery is painted per vertex, so a denser loft keeps stripes and camo edges crisp.
-	var segs := 40 if lod_detail >= 2 else (24 if lod_detail >= 1 else 12)
-	var nrows := 110 if lod_detail >= 2 else (44 if lod_detail >= 1 else 16)
+	# livery_quality 0 = Performance (lean), 1 = High (default), 2 = Ultra (dense loft for the crispest paint edges)
+	var segs: int = [26, 32, 40][livery_quality] if lod_detail >= 2 else (24 if lod_detail >= 1 else 12)
+	var nrows: int = [56, 84, 110][livery_quality] if lod_detail >= 2 else (44 if lod_detail >= 1 else 16)
 	var core := int(cidx["fuselage"])
 	var tail := _add_comp("tail_boom", core, "fuselage", 0.9, true)
 	var nose := -1
