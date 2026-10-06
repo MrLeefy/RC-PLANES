@@ -11,7 +11,7 @@ func _ready() -> void:
 		if not h.is_empty():
 			o["htail"] = {"z": h["z"], "span": h["span"], "root": h["root"], "tip": h["tip"], "sweep": h["sweep"]}
 		for v in d["vtails"]:
-			o["vtails"].append({"z": v["z"], "x": v.get("x", 0.0), "mirror": v.get("mirror", false)})
+			o["vtails"].append({"z": v["z"], "y": v["y"], "x": v.get("x", 0.0), "height": v["height"], "root": v["root"], "tip": v["tip"], "sweep": v["sweep"], "cant": v.get("cant", 0.0), "mirror": v.get("mirror", false)})
 		var engs := []
 		for e in d["engines"]:
 			var p: Vector3 = e["pos"]

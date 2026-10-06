@@ -78,6 +78,12 @@ Date: 2026-09-26 · Build: 0.9.0 (versionCode 9) · Godot 4.7.2 stable · Jolt �
 - 254 / 254 tests on two consecutive runs; flight bench clean.
 - Still NOT matched: F-22 chined nose, Concorde wing kink / nacelle shape, 747 engine and pylon shape, A-10 tail shape, and every fuselage side/front outline (only planforms were fitted).
 
+### Reference pass 6 (2026-10-06): side-view fit
+- Reference evidence (scratchpad `/tmp/claude-0/ref/`, never shipped): photo + three-view for Cessna 150 (c150_a.jpg, c150_3v), Super Cub (cub_a.jpg, cub_3v), P-51D (p51_side.jpg, p51_3v), F-22 (f22_a.jpg, f22_3v), A-10 (a10_a.jpg, a10_3v), F-16 (f16_prof.jpg, f16_3v), Concorde (concorde_a.jpg, concorde_3v), 747-400 (b747_a.jpg, b747_3v), C-130 (c130_a.jpg, c130_3v). All fetched from Wikimedia Commons via Special:FilePath with a User-Agent and pauses.
+- Side view: `tools/outline_fit/side*.py` extract the upper contour (canopy / hump / fin line) of each three-view's side drawing; a bounded search (+-15 % of fuselage half-height per station, top edge only) was applied to Skylark, Tundra Cub, Brute 10, Skyliner, Cargomaster and Striker (all flight tests still green). Offset-free RMS error as % of length, now: Skylark 1.1, Tundra Cub 2.0, Belle 51 3.4, Specter 22 3.2, Brute 10 3.3, Striker 1.5, Mach Arrow 3.8, Skyliner 3.5, Cargomaster 1.6.
+- New test "scale: side-view upper contour matches the real type's drawing" using derived 40-sample contours in `tests/reference_side.json` (no image shipped).
+- Limits: the side fit covers only the upper contour (gear, props, nacelles and the belly line were excluded because they distort the silhouette), fin shape only through the fuselage-plus-fin outline, and no front-view fit exists. F-22 chined nose, Concorde nacelles and wing kink, 747 pylons and A-10 tail shape were not matched by measurement.
+
 ## Automated suite (`-- --test`): 28 / 28 PASS
 - **PASS** transmitter: Linear preset is exactly linear
 - **PASS** transmitter: expo softens centre

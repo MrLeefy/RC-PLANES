@@ -163,6 +163,43 @@ func _outline_iou(d: Dictionary, ref: Array) -> float:
 				uni += 1
 	return float(inter) / float(maxi(uni, 1))
 
+## RMS difference (percent of length, offset-free) between the replica's side upper contour (fuselage top and fin) and a
+## 40-sample reference contour (fractions of length).
+func _side_rms(d: Dictionary, ref: Array) -> float:
+	var n := ref.size()
+	var length := float(d["length"])
+	var st: Array = d["fuselage"]
+	var diffs := []
+	for i in n:
+		if i < int(n * 0.03) or i > int(n * 0.97):
+			continue
+		var z := length * float(i) / float(n - 1)
+		var y := -1e9
+		if z >= float(st[0][0]) and z <= float(st[st.size() - 1][0]):
+			for k in st.size() - 1:
+				if z >= float(st[k][0]) and z <= float(st[k + 1][0]):
+					var u := (z - float(st[k][0])) / maxf(float(st[k + 1][0]) - float(st[k][0]), 1e-6)
+					y = lerpf(float(st[k][3]) + float(st[k][2]), float(st[k + 1][3]) + float(st[k + 1][2]), u)
+					break
+		for v in d["vtails"]:
+			for si in 12:
+				var s := float(si) / 11.0
+				var yy := float(v["y"]) + s * float(v["height"])
+				var le := float(v["z"]) + s * float(v["height"]) * tan(deg_to_rad(float(v["sweep"])))
+				var ch := lerpf(float(v["root"]), float(v["tip"]), s)
+				if z >= le and z <= le + ch:
+					y = maxf(y, yy)
+		if y > -1e8:
+			diffs.append(y / length - float(ref[i]))
+	if diffs.is_empty():
+		return 99.0
+	diffs.sort()
+	var med := float(diffs[diffs.size() / 2])
+	var ss := 0.0
+	for x in diffs:
+		ss += (float(x) - med) * (float(x) - med)
+	return sqrt(ss / float(diffs.size())) * 100.0
+
 # ---------------------------------------------------------------- specs / mass
 func t_spec_sheets() -> void:
 	var bad_env := []
@@ -245,6 +282,17 @@ func t_spec_sheets() -> void:
 		if v < float(floors[id]):
 			bad_outline.append("%s IoU %.2f < %.2f" % [id, v, floors[id]])
 	_ok("scale: planform outline overlaps the real type's three-view silhouette (IoU floors)", bad_outline.is_empty(), str(bad_outline) + " | " + ", ".join(iou_txt))
+	# side-view upper contour (canopy / hump / fin line) vs the real type's three-view side drawing, offset-free, % of length
+	var side_ref: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://tests/reference_side.json"))
+	var side_max := {"skylark": 1.8, "tundra_cub": 2.7, "belle51": 4.1, "specter22": 3.9, "brute10": 4.0, "striker16": 2.2, "macharrow": 4.5, "skyliner": 4.2, "cargo130": 2.3}
+	var side_bad := []
+	var side_txt := []
+	for id in side_max:
+		var e := _side_rms(AircraftDB.by_id(id), side_ref[id])
+		side_txt.append("%s %.1f" % [id, e])
+		if e > float(side_max[id]):
+			side_bad.append("%s side RMS %.1f %% > %.1f" % [id, e, side_max[id]])
+	_ok("scale: side-view upper contour matches the real type's drawing (RMS % of length)", side_bad.is_empty(), str(side_bad) + " | " + ", ".join(side_txt))
 	_ok("scale: aspect ratio of the replicas matches the real types within 12 %", bad_ar.is_empty(), str(bad_ar))
 	_ok("scale: length/span of the replicas matches the real types within 8 %", bad_ratio.is_empty(), str(bad_ratio))
 	_ok("specs: mass book-keeping adds up and inertia is physical", bad_mass.is_empty(), str(bad_mass))
