@@ -47,6 +47,14 @@ Date: 2026-09-26 · Build: 0.9.0 (versionCode 9) · Godot 4.7.2 stable · Jolt �
 - Belle 51 (P-51D reference): boxy belly radiator scoop with dark inlet, chin carburettor scoop, dorsal fillet. Striker 16 (F-16 reference): dorsal spine added. Checked against the P-51D three-view (length/span 0.87), F-16 and A-10 three-views and photos.
 - Not yet done from the photos: re-modelling the P-51, F-16, A-10, Concorde and 747 outlines against the 3-views (only the C-130 was reworked this round), and no texture photos are used.
 
+### Reference pass 2 (2026-10-06) - what was and was not matched
+- Fetched into the scratchpad (study only, never shipped): photo + three-view for 747-400, C-130, Concorde, P-51D, F-16, A-10, F-22, Cessna 150, Super Cub.
+- Matched/measured: new test "scale: aspect ratio ... within 12 %" against published span and wing area for all nine real types; length/span within 8 %. Fixed Striker (wing 1.70 m span), Skyliner and Cargomaster wing areas; Super Cub fuselage slimmed, round tips; Skylark wing seated lower with smaller spats.
+- New test "hangar: display models build off-thread, are cached, neighbours are prefetched and a cached switch is instant" (main thread kept rendering 4400+ frames during the build; cached switch instant). 252-ish tests, all passing on two runs.
+- NOT matched: F-22 chined nose and canted-tail details, Concorde nacelle pairs and wing kink, 747 upper-deck window rows and nacelle shapes, A-10 twin-fin tail shape. These were compared by eye only; no measured outline fit was done.
+- NOT fixed: stair-stepped livery stripe edges. Raising the fuselage row count 110 to 190 (+27 % triangles) and ring segments made no visible difference, because the steps come from the per-vertex paint function itself; a shader-side stripe mask would be needed. Decals are still blurry up close.
+- Needs the user's phone: frame rate, thermals, touch feel, audio latency.
+
 ## Automated suite (`-- --test`): 28 / 28 PASS
 - **PASS** transmitter: Linear preset is exactly linear
 - **PASS** transmitter: expo softens centre

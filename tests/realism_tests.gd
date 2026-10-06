@@ -31,6 +31,7 @@ func _run_all() -> void:
 		Settings.data["aircraft_cfg"] = {}
 	await t_audio_families()
 	await t_hangar_input()
+	await t_hangar_cache()
 	t_spec_sheets()
 	var only := OS.get_environment("RT_ONLY")
 	for id in AircraftDB.ids():
@@ -80,6 +81,39 @@ func t_hangar_input() -> void:
 	var hold_ok: bool = menu.sel_id == ids[0]
 	_ok("hangar: tap selects an aircraft card, a drag over cards only scrolls, a long hold selects nothing", tap_ok and drag_ok and hold_ok, "tap=%s drag=%s hold=%s" % [tap_ok, drag_ok, hold_ok])
 	menu.queue_free()
+
+## The hangar builds display models on a worker thread, caches them and pre-builds the neighbouring cards.
+func t_hangar_cache() -> void:
+	var main := get_parent()
+	main.state = "menu"
+	main.menu = HangarMenu.new()
+	main.ui.add_child(main.menu)
+	await _frames(2)
+	var ids := AircraftDB.ids()
+	main.menu.sel_id = ids[3]
+	main._show_display(ids[3])
+	var t0 := Time.get_ticks_msec()
+	var frames_during := 0
+	while (main.display_ac == null or not is_instance_valid(main.display_ac) or String(main.display_ac.def["id"]) != ids[3]) and Time.get_ticks_msec() - t0 < 60000:
+		frames_during += 1
+		await get_tree().process_frame
+	var shown: bool = main.display_ac != null and is_instance_valid(main.display_ac) and main.display_ac.visible and String(main.display_ac.def["id"]) == ids[3]
+	# let the neighbour prefetch finish
+	var t1 := Time.get_ticks_msec()
+	while main._disp_cache.size() < 3 and Time.get_ticks_msec() - t1 < 90000:
+		await get_tree().process_frame
+	var prefetched: bool = main._disp_cache.has(main._disp_key(ids[4])) and main._disp_cache.has(main._disp_key(ids[2]))
+	# switching to a prefetched neighbour is immediate (no build wait) and the old model is hidden, not rebuilt
+	var before: Aircraft = main.display_ac
+	main.menu.sel_id = ids[4]
+	main._show_display(ids[4])
+	var instant: bool = main.display_ac != null and String(main.display_ac.def["id"]) == ids[4] and main.display_ac.visible and not before.visible
+	var main_thread_ok: bool = frames_during >= 5   # the main thread kept rendering frames while the model was building
+	_ok("hangar: display models build off-thread, are cached, neighbours are prefetched and a cached switch is instant", shown and prefetched and instant and main_thread_ok,
+		"shown=%s prefetched=%s instant=%s frames_during_build=%d cache=%d" % [shown, prefetched, instant, frames_during, main._disp_cache.size()])
+	main._disp_clear()
+	main.menu.queue_free()
+	main.menu = null
 
 # ---------------------------------------------------------------- specs / mass
 func t_spec_sheets() -> void:
