@@ -64,6 +64,13 @@ Date: 2026-09-26 · Build: 0.9.0 (versionCode 9) · Godot 4.7.2 stable · Jolt �
 - Still NOT matched to references: F-22 chined nose, Concorde wing kink and nacelle shape, 747 engine/pylon shape, A-10 tail shape (compared by eye; no measured outline fit).
 - 253 / 253 tests on two consecutive runs; flight bench clean; import clean.
 
+### Reference pass 4 (2026-10-06): measured outline fit and triangle budget
+- New dev tool `tools/outline_fit/` (reference images are NOT in the repo): flood-fills the top view of each real type's three-view into a silhouette, rasterises the replica's planform (fuselage, wings, tailplane, nacelles) at the same normalised length/span, and reports silhouette IoU. Bounded random search on wing/tailplane z, chord and sweep (max +-15 %) gave large gains.
+- IoU before -> after (applied): Skylark 0.77 -> 0.89, Specter 22 (F-22) 0.65 -> 0.81, Brute 10 (A-10) 0.72 -> 0.86, Skyliner (747) 0.79 -> 0.88, Striker 16 (F-16, wing only) 0.54 -> about 0.7.
+- Found but NOT applied, because the fitted geometry broke flight tests (no test was loosened): Tundra Cub (0.68; hidden-lead ballast 6 %), Belle 51 (0.69; spin-resistance test), Cargomaster (0.70; gear rest test), Mach Arrow (0.70; take-off test), and the Striker tailplane (spin must-enter test). These need joint retuning of CG/gear with the new wing, which I did not do.
+- Triangle budget: livery quality tiers (Performance lean / High default / Ultra dense). Default High measures 991k triangles fleet-wide vs 853k originally (+16 %), Skylark 59k vs 52k. Performance is leaner than the original; Ultra is the +68 % variant.
+- Remaining mismatches (judged by eye only): F-22 chined nose, Concorde wing kink/nacelle shape, 747 engine/pylon shape, A-10 tail shape. Fuselage outlines were not fitted, only wing/tailplane planforms.
+
 ## Automated suite (`-- --test`): 28 / 28 PASS
 - **PASS** transmitter: Linear preset is exactly linear
 - **PASS** transmitter: expo softens centre
