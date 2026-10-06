@@ -112,20 +112,25 @@ var _space_rid: RID
 var _ray_params: PhysicsRayQueryParameters3D
 
 # ================================================================ setup
-func setup(definition: Dictionary, config: Dictionary, detail_level := 2, for_display := false) -> void:
+func setup(definition: Dictionary, config: Dictionary, detail_level := 2, for_display := false, prebuilt := {}) -> void:
 	def = definition
 	cfg = config
 	detail = detail_level
 	display_only = for_display
 	name = String(def["id"])
-	var b := AircraftBuilder.new()
-	build = b.build(def, cfg, detail)
+	if prebuilt.is_empty():
+		var b := AircraftBuilder.new()
+		build = b.build(def, cfg, detail)
+		body_drag = b.body_drag
+	else:
+		# geometry built earlier on a worker thread (the hangar pre-builds models off the main thread)
+		build = prebuilt["build"]
+		body_drag = prebuilt["drag"]
 	comps = build["comps"]
 	panels = build["panels"]
 	surfaces = build["surfaces"]
 	eng_defs = build["engines"]
 	wheels = build["wheels"]
-	body_drag = b.body_drag
 	span = float(build["span"])
 	length_m = float(build["length"])
 	mac_c = float(build["mac"]["c"])
@@ -201,8 +206,9 @@ func setup(definition: Dictionary, config: Dictionary, detail_level := 2, for_di
 	physics_material_override = pm
 	recompute_mass()
 	has_htail = not (def["htail"] as Dictionary).is_empty()
-	_build_probes()
-	compute_factory_trim()
+	if not display_only:
+		_build_probes()
+		compute_factory_trim()   # the hangar model is a frozen display piece: no flight trim or impact probes needed
 	gear_down = true
 	gear_pos = 1.0
 	if display_only:

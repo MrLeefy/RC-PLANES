@@ -129,6 +129,8 @@ func _apply_graphics() -> void:
 		field.apply_quality(q)
 
 func _process(delta: float) -> void:
+	if _disp_task != -1:
+		_disp_poll()
 	if not bool(Settings.g("graphics", "auto_scale", true)) or state == "loading" or get_tree().paused:
 		return
 	if scaler.update(delta, Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS)):
@@ -154,27 +156,138 @@ func _open_menu() -> void:
 		Game.wind.configure(String(Settings.g("environment", "wind", "light")), String(Settings.g("environment", "wind_dir", "headwind")), Vector3(1, 0, 0)))
 	_show_display(menu.sel_id)
 
+# ---- hangar display models: built on a worker thread, cached, and pre-built for the neighbouring cards
+const DISP_CACHE_MAX := 6
+var _disp_cache: Dictionary = {}      # key -> Aircraft (hidden unless on show)
+var _disp_lru: Array = []
+var _disp_task := -1
+var _disp_job: Dictionary = {}
+var _disp_want := ""
+var _disp_label: Label
+
+func _disp_key(id: String) -> String:
+	return id + JSON.stringify(Settings.aircraft_cfg(id))
+
 func _show_display(id: String) -> void:
-	if display_ac and is_instance_valid(display_ac):
-		display_ac.queue_free()
-	display_ac = Aircraft.new()
-	display_ac.setup(AircraftDB.by_id(id), Settings.aircraft_cfg(id), 2, true)
-	world.add_child(display_ac)
+	var key := _disp_key(id)
+	_disp_want = key
+	if _disp_cache.has(key):
+		_present_display(key, id)
+	else:
+		_disp_loading(true)
+	_disp_pump()
+
+func _disp_loading(on: bool) -> void:
+	if on and (_disp_label == null or not is_instance_valid(_disp_label)):
+		_disp_label = UITheme.label("Loading model...", 24, UITheme.TEXT)
+		_disp_label.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		_disp_label.add_theme_color_override("font_shadow_color", Color(0, 0, 0, 0.8))
+		_disp_label.add_theme_constant_override("shadow_offset_y", 2)
+		ui.add_child(_disp_label)
+		_disp_label.set_anchors_and_offsets_preset(Control.PRESET_CENTER_TOP)
+		_disp_label.position.y = 190.0
+	if _disp_label and is_instance_valid(_disp_label):
+		_disp_label.visible = on
+
+## Start the next build if none is running: what is on screen first, then the neighbouring cards.
+func _disp_pump() -> void:
+	if _disp_task != -1 or menu == null or not is_instance_valid(menu):
+		return
+	var ids: Array = AircraftDB.ids()
+	var order: Array = []
+	var cur := ids.find(menu.sel_id)
+	order.append(menu.sel_id)
+	for off in [1, -1, 2, -2]:
+		var j: int = cur + off
+		if j >= 0 and j < ids.size():
+			order.append(ids[j])
+	for id in order:
+		var key := _disp_key(String(id))
+		if _disp_cache.has(key):
+			continue
+		var d: Dictionary = AircraftDB.by_id(String(id)).duplicate(true)
+		var cfg: Dictionary = Settings.aircraft_cfg(String(id)).duplicate(true)
+		var job := {"key": key, "id": String(id), "def": d, "cfg": cfg, "res": {}}
+		_disp_job = job
+		_disp_task = WorkerThreadPool.add_task(func():
+			var b := AircraftBuilder.new()
+			job["res"]["build"] = b.build(d, cfg, 2)
+			job["res"]["drag"] = b.body_drag)
+		return
+
+func _disp_poll() -> void:
+	if _disp_task == -1 or not WorkerThreadPool.is_task_completed(_disp_task):
+		return
+	WorkerThreadPool.wait_for_task_completion(_disp_task)
+	_disp_task = -1
+	var job := _disp_job
+	_disp_job = {}
+	if menu == null or not is_instance_valid(menu):
+		return
+	var a := Aircraft.new()
+	a.setup(job["def"], job["cfg"], 2, true, job["res"])
+	a.visible = false
+	world.add_child(a)
 	var low := 0.0
-	for w in display_ac.wheels:
+	for w in a.wheels:
 		low = minf(low, (w["center"] as Vector3).y - float(w["r"]))
-	var b := Basis(Vector3.UP, deg_to_rad(-58.0))
-	display_ac.global_transform = Transform3D(b, Vector3(0, 0.05 - low, 3.0))
-	display_ac.gear_pos = 1.0
-	cam.target = display_ac
+	a.global_transform = Transform3D(Basis(Vector3.UP, deg_to_rad(-58.0)), Vector3(0, 0.05 - low, 3.0))
+	a.gear_pos = 1.0
+	var key := String(job["key"])
+	_disp_cache[key] = a
+	_disp_lru.erase(key)
+	_disp_lru.append(key)
+	while _disp_lru.size() > DISP_CACHE_MAX:
+		var old := String(_disp_lru[0])
+		if old == _disp_want:
+			break
+		_disp_lru.pop_front()
+		var oa: Aircraft = _disp_cache.get(old)
+		_disp_cache.erase(old)
+		if oa and is_instance_valid(oa):
+			if oa == display_ac:
+				display_ac = null
+			oa.queue_free()
+	if key == _disp_want:
+		_present_display(key, String(job["id"]))
+	_disp_pump()
+
+func _present_display(key: String, id: String) -> void:
+	var a: Aircraft = _disp_cache.get(key)
+	if a == null or not is_instance_valid(a):
+		return
+	if display_ac and is_instance_valid(display_ac) and display_ac != a:
+		display_ac.visible = false
+	display_ac = a
+	a.visible = true
+	_disp_lru.erase(key)
+	_disp_lru.append(key)
+	_disp_loading(false)
+	cam.target = a
 	cam.override_target = false
 	cam.set_mode("free")
-	var sz := maxf(display_ac.span, display_ac.length_m)
+	var sz := maxf(a.span, a.length_m)
 	cam.orbit_dist = clampf(sz * 1.35, 1.6, 7.5)
 	cam.orbit_yaw = deg_to_rad(150.0)
 	cam.orbit_pitch = 0.13
 	cam.hangar_offset = sz * 0.28
 	cam.snap()
+
+## Leaving the hangar: stop any build and drop every cached display model.
+func _disp_clear() -> void:
+	if _disp_task != -1:
+		WorkerThreadPool.wait_for_task_completion(_disp_task)
+		_disp_task = -1
+		_disp_job = {}
+	for k in _disp_cache.keys():
+		var a: Aircraft = _disp_cache[k]
+		if a and is_instance_valid(a):
+			a.queue_free()
+	_disp_cache.clear()
+	_disp_lru.clear()
+	display_ac = null
+	_disp_want = ""
+	_disp_loading(false)
 
 func _process_menu_idle(delta: float) -> void:
 	pass
@@ -198,9 +311,7 @@ func _start_flight() -> void:
 	var mode_id := String(Settings.data.get("last_mode", "free"))
 	menu.queue_free()
 	menu = null
-	if display_ac and is_instance_valid(display_ac):
-		display_ac.queue_free()
-		display_ac = null
+	_disp_clear()
 	field.set_time_of_day(String(Settings.g("environment", "time", "golden")))
 	flight = Flight.new()
 	flight.name = "Flight"

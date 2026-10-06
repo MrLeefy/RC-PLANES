@@ -148,10 +148,14 @@ func _ready() -> void:
 		b.text = "%s\n%s" % [d["name"], d["category"]]
 		b.add_theme_font_size_override("font_size", 17)
 		b.toggle_mode = true
+		b.focus_mode = Control.FOCUS_NONE
+		# Cards never take the pointer themselves: a drag that happens to end over a card must scroll the strip,
+		# not select that card. Taps are resolved in _carousel_input() instead.
+		b.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		var id: String = d["id"]
-		b.pressed.connect(func(): select(id))
 		carousel.add_child(b)
 		cards[id] = b
+	sc.gui_input.connect(_carousel_input.bind(sc))
 	add_child(sc)
 	fly_btn = UITheme.accent_button("FLY  >", 260, 34)
 	fly_btn.custom_minimum_size = Vector2(260, 78)
@@ -163,6 +167,49 @@ func _ready() -> void:
 	resized.connect(_layout)
 	_layout()
 	select(sel_id, true)
+
+var _tap_start := Vector2.ZERO
+var _tap_time := 0
+var _tap_moved := false
+var _tap_down := false
+const TAP_SLOP := 18.0
+
+## Tap selects a card; a drag scrolls the strip and selects nothing (touch and mouse).
+func _carousel_input(ev: InputEvent, sc: ScrollContainer) -> void:
+	var pos := Vector2.ZERO
+	var kind := ""
+	if ev is InputEventScreenTouch and (ev as InputEventScreenTouch).index == 0:
+		pos = (ev as InputEventScreenTouch).position
+		kind = "down" if (ev as InputEventScreenTouch).pressed else "up"
+	elif ev is InputEventMouseButton and (ev as InputEventMouseButton).button_index == MOUSE_BUTTON_LEFT and ev.device != InputEvent.DEVICE_ID_EMULATION:
+		pos = (ev as InputEventMouseButton).position
+		kind = "down" if (ev as InputEventMouseButton).pressed else "up"
+	elif ev is InputEventScreenDrag and (ev as InputEventScreenDrag).index == 0:
+		if _tap_down and (ev as InputEventScreenDrag).position.distance_to(_tap_start) > TAP_SLOP:
+			_tap_moved = true
+		return
+	elif ev is InputEventMouseMotion and ev.device != InputEvent.DEVICE_ID_EMULATION and _tap_down:
+		var mm := ev as InputEventMouseMotion
+		if mm.position.distance_to(_tap_start) > TAP_SLOP:
+			_tap_moved = true
+		if _tap_moved:
+			sc.scroll_horizontal -= int(mm.relative.x)   # desktop mouse drag-scroll (touch is handled by the container)
+		return
+	else:
+		return
+	if kind == "down":
+		_tap_down = true
+		_tap_moved = false
+		_tap_start = pos
+		_tap_time = Time.get_ticks_msec()
+	elif _tap_down:
+		_tap_down = false
+		if not _tap_moved and Time.get_ticks_msec() - _tap_time < 700 and pos.distance_to(_tap_start) <= TAP_SLOP:
+			var g := sc.get_global_rect().position + pos
+			for k in cards.keys():
+				if (cards[k] as Control).get_global_rect().has_point(g):
+					select(String(k))
+					break
 
 func _top_opt(label_text: String, items: Array, sel: int, cb: Callable) -> void:
 	var box := VBoxContainer.new()

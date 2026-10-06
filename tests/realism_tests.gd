@@ -30,12 +30,56 @@ func _run_all() -> void:
 		Game.wind.configure("calm", "headwind", Vector3(1, 0, 0))
 		Settings.data["aircraft_cfg"] = {}
 	await t_audio_families()
+	await t_hangar_input()
 	t_spec_sheets()
 	var only := OS.get_environment("RT_ONLY")
 	for id in AircraftDB.ids():
 		if only == "" or id in only.split(","):
 			await t_aircraft(id)
 	await t_fuel_and_parts_change_mass()
+
+# ---------------------------------------------------------------- hangar carousel input
+func _touch_ev(pressed: bool, p: Vector2) -> InputEventScreenTouch:
+	var e := InputEventScreenTouch.new()
+	e.index = 0
+	e.pressed = pressed
+	e.position = p
+	return e
+
+func t_hangar_input() -> void:
+	var menu := HangarMenu.new()
+	get_parent().ui.add_child(menu)
+	await _frames(3)
+	var sc: ScrollContainer = menu.get_node("Carousel")
+	var ids := AircraftDB.ids()
+	menu.select(ids[0], true)
+	var target: String = ids[2]
+	var other: String = ids[1]
+	var origin := sc.get_global_rect().position
+	var c_target: Vector2 = (menu.cards[target] as Control).get_global_rect().get_center() - origin
+	var c_other: Vector2 = (menu.cards[other] as Control).get_global_rect().get_center() - origin
+	# a tap on a card selects it
+	menu._carousel_input(_touch_ev(true, c_target), sc)
+	menu._carousel_input(_touch_ev(false, c_target), sc)
+	var tap_ok: bool = menu.sel_id == target
+	# a drag that starts on one card and ends over another scrolls and selects nothing
+	menu.select(ids[0], true)
+	menu._carousel_input(_touch_ev(true, c_target), sc)
+	var drag := InputEventScreenDrag.new()
+	drag.index = 0
+	drag.position = c_other
+	menu._carousel_input(drag, sc)
+	menu._carousel_input(_touch_ev(false, c_other), sc)
+	var drag_ok: bool = menu.sel_id == ids[0]
+	# a slow press (long hold without moving) is not a tap either
+	menu._tap_down = true
+	menu._tap_moved = false
+	menu._tap_start = c_target
+	menu._tap_time = Time.get_ticks_msec() - 2000
+	menu._carousel_input(_touch_ev(false, c_target), sc)
+	var hold_ok: bool = menu.sel_id == ids[0]
+	_ok("hangar: tap selects an aircraft card, a drag over cards only scrolls, a long hold selects nothing", tap_ok and drag_ok and hold_ok, "tap=%s drag=%s hold=%s" % [tap_ok, drag_ok, hold_ok])
+	menu.queue_free()
 
 # ---------------------------------------------------------------- specs / mass
 func t_spec_sheets() -> void:

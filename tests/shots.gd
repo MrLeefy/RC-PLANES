@@ -36,7 +36,11 @@ func _do(step: String):
 		"menu":
 			await _frames(4); await _shot("menu")
 		"select":
-			main.menu.select(parts[1]); await _frames(6)
+			main.menu.select(parts[1])
+			var tw0 := Time.get_ticks_msec()
+			while (main.display_ac == null or not is_instance_valid(main.display_ac) or not main.display_ac.visible or String(main.display_ac.def["id"]) != parts[1]) and Time.get_ticks_msec() - tw0 < 120000:
+				await get_tree().process_frame
+			await _frames(6)
 			if main.menu: main.menu.visible = false
 			await _shot("hangar_" + parts[1])
 			if main.menu: main.menu.visible = true
