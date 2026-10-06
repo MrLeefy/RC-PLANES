@@ -12,13 +12,17 @@ uniform float panel_lines = 0.0;
 uniform vec3 substrate : source_color = vec3(0.85, 0.85, 0.8);
 instance uniform float damage = 0.0;
 instance uniform float dirt = 0.0;
+// 0 = performance (base look), 1 = high, 2 = ultra; set from the graphics quality
+global uniform float gfx_detail;
 
 varying vec3 opos;
 varying vec3 onrm;
+varying float wny;
 
 void vertex() {
 	opos = VERTEX;
 	onrm = NORMAL;
+	wny = normalize((MODEL_MATRIX * vec4(NORMAL, 0.0)).xyz).y;
 }
 
 void fragment() {
@@ -29,6 +33,9 @@ void fragment() {
 	vec3 g = vec3(0.0);
 	float pixel = max(max(fwidth(opos.x), fwidth(opos.y)), fwidth(opos.z));
 	float micro = 1.0 - smoothstep(0.0015, 0.012, pixel);
+	float hi = step(0.5, gfx_detail);          // high quality extras
+	float ultra = step(1.5, gfx_detail);       // ultra extras
+	float seam_zone = 0.0;
 	if (kind == 0) {
 		float b = mix(0.5, n3(opos * 170.0), micro);
 		base *= 0.978 + 0.044 * b;
@@ -47,17 +54,19 @@ void fragment() {
 		base = mix(vec3(0.032,0.034,0.039), mix(vec3(0.012, 0.013, 0.015), vec3(0.06, 0.062, 0.068), tow * (hor ? 1.0 : 0.6)), weave);
 		r = 0.35 + (0.07 - 0.14 * tow) * weave;
 	} else if (kind == 4 || kind == 8 || kind == 2) {
-		// panels: oil-canned brightness variation + seams + rivets
+		// riveted skin: oil-canned brightness variation, seam grooves (albedo + bevelled normals), rivet dimples
 		vec3 q = opos * vec3(8.0, 9.0, 6.5);
 		vec3 cid = floor(q);
 		float pv = h3(cid);
-		vec3 d = 0.5 - abs(fract(q) - 0.5);
+		vec3 fq = fract(q);
+		vec3 d = 0.5 - abs(fq - 0.5);
 		vec3 w = fwidth(q) * 0.9 + 0.002;
 		float lx = 1.0 - smoothstep(0.0, w.x, d.x - 0.002);
 		float lz = 1.0 - smoothstep(0.0, w.z, d.z - 0.002);
 		// fade seams out when they get sub-pixel to avoid banding/moire at distance
 		float fade = 1.0 - smoothstep(0.08, 0.25, max(fwidth(q.x), fwidth(q.z)));
 		float line = max(lx, lz) * panel_lines * fade;
+		seam_zone = max(1.0 - smoothstep(0.0, 0.05, d.x), 1.0 - smoothstep(0.0, 0.05, d.z)) * panel_lines * fade;
 		float riv = 0.0;
 		vec3 rq = fract(q * 7.0) - 0.5;
 		riv = (1.0 - smoothstep(0.08, 0.14, length(rq.xz))) * max(1.0 - smoothstep(0.0, 0.03, d.x), 1.0 - smoothstep(0.0, 0.03, d.z)) * panel_lines;
@@ -71,15 +80,43 @@ void fragment() {
 		}
 		base *= 1.0 - line * 0.28;
 		base *= 1.0 + riv * 0.18 * micro;
+		// bevelled seam normals: the groove catches the light on one side and shades the other
+		float sx = (fq.x < 0.5 ? 1.0 : -1.0) * (1.0 - smoothstep(0.0, w.x * 2.2, d.x));
+		float sz = (fq.z < 0.5 ? 1.0 : -1.0) * (1.0 - smoothstep(0.0, w.z * 2.2, d.z));
+		g += vec3(sx, 0.0, sz) * 0.55 * panel_lines * fade * hi;
+		// rivet domes
+		vec2 rd = rq.xz;
+		float rr = length(rd);
+		g += vec3(rd.x, 0.0, rd.y) / (rr + 0.001) * (1.0 - smoothstep(0.05, 0.13, rr)) * seam_zone * 0.7 * micro * hi;
+		if (kind == 4) {
+			// brushed metal: streaks follow the airflow (aircraft z axis); polished panels get a soft, stretched highlight
+			float st = n3(vec3(opos.x * 160.0, opos.y * 160.0, opos.z * 9.0));
+			r += (st - 0.5) * 0.10 * hi;
+			base *= 1.0 + (st - 0.5) * 0.06 * hi * (1.0 - paint);
+		}
 	} else if (kind == 5) {
 		vec2 w = UV * 420.0;
 		float wv = sin(w.x) * sin(w.y) * (1.0 - smoothstep(0.4, 1.6, max(fwidth(w.x), fwidth(w.y))));
 		base *= 0.95 + wv * 0.05;
 		r = rough + wv * 0.05;
+		g += vec3(sin(w.x), 0.0, sin(w.y)) * 0.12 * micro * hi;
 	} else if (kind == 6) {
 		float b = mix(0.5, n3(opos * 90.0), micro);
 		base *= 0.9 + b * 0.15;
 		r = rough;
+		g += vec3(b - 0.5, 0.0, n3(opos * 90.0 + 7.0) - 0.5) * 0.25 * micro * hi;
+	}
+	// paint finish: fine orange peel, airflow-aligned grime streaks and soot, underside soiling, edge sheen
+	if (kind == 1 || kind == 2 || kind == 7 || kind == 8) {
+		g += vec3(n3(opos * 260.0) - 0.5, 0.0, n3(opos * 260.0 + 9.0) - 0.5) * 0.10 * micro * hi;
+	}
+	if (hi > 0.5 && kind != 3 && kind != 9 && kind != 6) {
+		float lo = n3(vec3(opos.x * 6.0, opos.y * 6.0, opos.z * 1.1));                // broad fading
+		float streak = n3(vec3(opos.x * 45.0, opos.y * 45.0, opos.z * 2.6));        // thin streaks along the flow
+		float grime = smoothstep(0.55, 0.9, streak * 0.7 + lo * 0.5) * (0.35 + 0.65 * clamp(0.5 - wny * 0.6, 0.0, 1.0));
+		base *= 1.0 - grime * (0.045 + 0.05 * ultra);
+		r += grime * 0.08;
+		base *= 0.96 + 0.04 * clamp(wny * 0.5 + 0.5, 0.0, 1.0);                       // underside sits a little darker
 	}
 	// damage: exposed substrate, scratches, crush marks
 	if (damage > 0.001) {
@@ -109,6 +146,10 @@ void fragment() {
 	if (coat > 0.0) {
 		CLEARCOAT = coat;
 		CLEARCOAT_ROUGHNESS = 0.12;
+	}
+	if (hi > 0.5 && (kind == 0 || kind == 1 || kind == 5)) {
+		RIM = 0.18;
+		RIM_TINT = 0.6;
 	}
 	if (dot(g, g) > 0.0) {
 		NORMAL = normalize(NORMAL + mat3(VIEW_MATRIX * MODEL_MATRIX) * g);

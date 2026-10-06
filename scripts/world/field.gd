@@ -244,6 +244,7 @@ func set_time_of_day(preset: String) -> void:
 
 func apply_quality(q: String) -> void:
 	quality = q
+	RenderingServer.global_shader_parameter_set("gfx_detail", 0.0 if q == "performance" else (2.0 if q == "ultra" else 1.0))
 	match q:
 		"performance":
 			sun.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL

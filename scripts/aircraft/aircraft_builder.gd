@@ -1737,6 +1737,29 @@ func _build_details() -> void:
 	if bool(det.get("gun", false)):
 		var mk2 := _kit(_comp_part(core), "metalbare")
 		mk2.add_cylinder(Vector3(0, -0.02, -0.03), Vector3(0, -0.02, 0.02), 0.006, 0.006, 8, MeshKit.const_color(_lin(Color(0.2, 0.2, 0.2), 0.0)), true, true)
+	if det.has("sponsons"):
+		# main-gear sponsons: long blisters along the lower fuselage sides (C-130 style), not eggs under the belly
+		var sp: Dictionary = det["sponsons"]
+		var zc: float = (float(sp["z0"]) + float(sp["z1"])) * 0.5
+		var hl: float = (float(sp["z1"]) - float(sp["z0"])) * 0.5
+		var fps := _fus_param(zc)
+		var sk2 := _kit(_comp_part(core), "body")
+		for side in [-1.0, 1.0]:
+			var cs := Vector3(side * float(fps[0]) * 0.93, float(fps[2]) - float(fps[1]) * float(sp.get("drop", 0.58)), zc)
+			sk2.add_ellipsoid(cs, Vector3(float(fps[0]) * float(sp.get("w", 0.40)), float(fps[1]) * float(sp.get("h", 0.34)), hl), 20, 10, _pfn("fus"))
+	if det.has("wing_tanks") and d["wings"].size() > 0:
+		# external fuel tanks hung under the outer wings
+		var wt: Dictionary = d["wings"][0]
+		var half_t: float = float(wt["span"]) * 0.5
+		var tk := _kit(_comp_part(core), "body")
+		for fx in det["wing_tanks"]:
+			for side in [-1.0, 1.0]:
+				var xt: float = side * float(fx) * half_t
+				var ch: float = lerpf(float(wt["root"]), float(wt["tip"]), float(fx))
+				var zt: float = float(wt["z"]) + absf(xt) * tan(deg_to_rad(float(wt["sweep"]))) + ch * 0.32
+				var yt: float = float(wt["y"]) + absf(xt) * tan(deg_to_rad(float(wt["dihedral"]))) - ch * float(wt["thick"]) * 0.5 - 0.05
+				tk.add_ellipsoid(Vector3(xt, yt, zt), Vector3(0.034, 0.034, ch * 0.78), 16, 8, _pfn("nacelle"))
+				tk.add_cylinder(Vector3(xt, yt + 0.03, zt), Vector3(xt, yt + 0.05, zt), 0.006, 0.006, 6, _pfn("nacelle"), false, true)
 	if det.has("lerx") and d["wings"].size() > 0:
 		# leading-edge root extension: a flat blended strake from the fuselage side forward of the wing root
 		var wl: Dictionary = d["wings"][0]

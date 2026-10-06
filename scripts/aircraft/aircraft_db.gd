@@ -445,9 +445,9 @@ static func _build() -> Array:
 		"id": "cargo130", "name": "Cargomaster 130", "category": "Multi-engine",
 		"blurb": "Four-engine tactical transport. Huge high wing, props wash the flaps, lumbering and loud.",
 		"material": "painted", "mass": 4.0, "length": 1.60,
-		"fuselage": [[0.0, 0.02, 0.02, -0.01, 2.0], [0.05, 0.058, 0.065, -0.008, 2.1], [0.15, 0.088, 0.098, -0.003, 2.5],
-			[0.32, 0.095, 0.105, 0.0, 3.3], [0.78, 0.095, 0.105, 0.0, 3.5], [1.0, 0.085, 0.095, 0.022, 3.1],
-			[1.2, 0.055, 0.07, 0.058, 2.5], [1.45, 0.022, 0.032, 0.09, 2.1], [1.60, 0.010, 0.015, 0.095, 2.0]],
+		"fuselage": [[0.0, 0.040, 0.044, -0.016, 2.0], [0.04, 0.078, 0.086, -0.014, 2.1], [0.12, 0.100, 0.112, -0.006, 2.5],
+			[0.28, 0.108, 0.122, 0.0, 3.0], [0.40, 0.110, 0.124, 0.0, 3.4], [0.78, 0.110, 0.124, 0.0, 3.5], [1.0, 0.098, 0.112, 0.022, 3.1],
+			[1.2, 0.062, 0.078, 0.058, 2.5], [1.45, 0.024, 0.036, 0.09, 2.1], [1.60, 0.010, 0.016, 0.095, 2.0]],
 		"canopy": {"z0": 0.15, "z1": 0.31, "hw": 0.075, "hh": 0.045, "y": 0.058, "style": "airliner", "tint": Color(0.08, 0.1, 0.12)},
 		"wings": [_wing(0.60, 0.122, 2.05, 0.26, 0.16, {"dihedral": 1.5, "incidence": 2.0, "washout": 3.0, "thick": 0.15,
 			"camber": 0.035, "ail": [0.60, 0.95, 0.22], "flap": [0.07, 0.58, 0.25], "tip_style": "round", "stall_deg": 14.5})],
@@ -468,7 +468,7 @@ static func _build() -> Array:
 			{"text": "7315", "z": 1.45, "y": 0.28, "size": 0.05, "color": Color(0.12, 0.12, 0.13), "vtail": true}],
 		"batteries": [_batt("2x 4S 4000 mAh (parallel)", 4, 8.0, 0.86), _batt("2x 4S 5000 mAh (parallel)", 4, 10.0, 1.02)],
 		"props": [_prop("9 x 6 (4-blade)", 9, 6, 4), _prop("10 x 5 (3-blade)", 10, 5, 3)],
-		"body_cd": 0.20, "gear_drag": 0.015, "strength": 1.2, "details": {"ramp": [1.02, 1.36]},
+		"body_cd": 0.20, "gear_drag": 0.015, "strength": 1.2, "details": {"ramp": [1.02, 1.36], "sponsons": {"z0": 0.62, "z1": 1.14, "drop": 0.42, "w": 0.46, "h": 0.30}, "wing_tanks": [0.80]},
 	}))
 
 	# 15 ── Airliner: Skyliner 74 (747 style, 4 x 50 mm EDF)

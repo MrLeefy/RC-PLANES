@@ -80,3 +80,7 @@ grass_fade={
 "type": "float",
 "value": 55.0
 }
+gfx_detail={
+"type": "float",
+"value": 1.0
+}

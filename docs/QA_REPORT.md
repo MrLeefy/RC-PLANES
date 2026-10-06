@@ -39,6 +39,13 @@ Date: 2026-09-26 · Build: 0.9.0 (versionCode 9) · Godot 4.7.2 stable · Jolt �
 - Tried a second paint-edge refinement level: doubled triangles for a marginal gain, reverted.
 - Still rough: stair-stepped livery stripe edges on some fuselages (vertex-colour paint), blurry decals at close range, simple pilot figures, no cockpit interiors beyond a pilot and tub.
 
+### Reference-photo pass, menu performance (2026-10-06)
+- Hangar lag: model building (about 0.4 to 2.1 s per aircraft, all on the main thread) now runs on a worker thread; the main thread needs about 1 ms to attach the result. Up to 6 models stay cached and the neighbouring cards are pre-built, so flipping through the carousel is instant after the first build. Display models skip flight trim and impact probes. Measured headless: skylark 1.0 s, vortex540 2.1 s, skyliner 1.1 s on the worker; main thread stays at 150 to 300 frames during the build.
+- Carousel drag: cards no longer take the pointer, so a drag that ends over a card scrolls instead of selecting it; taps (under 18 px movement, under 0.7 s) select. New test covers tap, drag and long-hold.
+- Shader: aircraft skin now has bevelled panel-seam normals, rivet domes, brushed-metal streaking, orange-peel paint, airflow-aligned grime and soot, underside soiling, and edge sheen on foam/film/fabric, all gated by a graphics-quality global (off on Performance, on for High, stronger on Ultra); glass has faint scratches and uneven tint.
+- Real reference images (Wikimedia Commons, used only as study material, not shipped): 747-400, C-130 (3-view and photo), Concorde, P-51D (3-view, side, front), F-16 (3-view, profile), A-10 (3-view, photo). Cargomaster now has C-130 style main-gear sponsons, deeper boxy fuselage and underwing tanks.
+- Not yet done from the photos: re-modelling the P-51, F-16, A-10, Concorde and 747 outlines against the 3-views (only the C-130 was reworked this round), and no texture photos are used.
+
 ## Automated suite (`-- --test`): 28 / 28 PASS
 - **PASS** transmitter: Linear preset is exactly linear
 - **PASS** transmitter: expo softens centre
