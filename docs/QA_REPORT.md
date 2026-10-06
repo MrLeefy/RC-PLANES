@@ -71,6 +71,13 @@ Date: 2026-09-26 · Build: 0.9.0 (versionCode 9) · Godot 4.7.2 stable · Jolt �
 - Triangle budget: livery quality tiers (Performance lean / High default / Ultra dense). Default High measures 991k triangles fleet-wide vs 853k originally (+16 %), Skylark 59k vs 52k. Performance is leaner than the original; Ultra is the +68 % variant.
 - Remaining mismatches (judged by eye only): F-22 chined nose, Concorde wing kink/nacelle shape, 747 engine/pylon shape, A-10 tail shape. Fuselage outlines were not fitted, only wing/tailplane planforms.
 
+### Reference pass 5 (2026-10-06): outline fits applied and locked in by a test
+- Applied the fitted wing planforms to all nine real types except the Striker tailplane (its must-enter-spin test failed with the fitted tail; the test was not loosened). Retuned to keep flight tests green: Tundra Cub CG 0.375 (was 0.34; note this is aft for a Cub and sits just inside the 20-38 % envelope), Cargomaster main gear z 0.84 and sponsons shifted, Mach Arrow main gear z 1.18, Belle 51 washout 3.5 deg.
+- Planform silhouette overlap (IoU) vs the real three-view top view, now: Skylark 0.86, Tundra Cub 0.87, Belle 51 0.74, Specter 22 0.80, Brute 10 0.84, Striker 16 0.73, Mach Arrow 0.77, Skyliner 0.85, Cargomaster 0.81 (40x40 grid; earlier 240x240 numbers differ slightly).
+- New test "scale: planform outline overlaps the real type's three-view silhouette (IoU floors)" using derived occupancy grids in tests/reference_outlines.json (data derived from the drawings; no image shipped). Floors sit about 0.04 under the measured values.
+- 254 / 254 tests on two consecutive runs; flight bench clean.
+- Still NOT matched: F-22 chined nose, Concorde wing kink / nacelle shape, 747 engine and pylon shape, A-10 tail shape, and every fuselage side/front outline (only planforms were fitted).
+
 ## Automated suite (`-- --test`): 28 / 28 PASS
 - **PASS** transmitter: Linear preset is exactly linear
 - **PASS** transmitter: expo softens centre

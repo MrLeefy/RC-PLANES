@@ -115,6 +115,54 @@ func t_hangar_cache() -> void:
 	main.menu.queue_free()
 	main.menu = null
 
+## Rasterises the planform (fuselage, wings, tailplane, nacelles) on a 40x40 grid, nose at the top, and returns the IoU
+## against a reference occupancy grid (array of 40 strings of '0'/'1').
+func _outline_iou(d: Dictionary, ref: Array) -> float:
+	var n := ref.size()
+	var length := float(d["length"])
+	var span := 0.1
+	for w in d["wings"]:
+		span = maxf(span, float(w["span"]))
+	if not (d["htail"] as Dictionary).is_empty():
+		span = maxf(span, float((d["htail"] as Dictionary)["span"]))
+	var st: Array = d["fuselage"]
+	var inter := 0
+	var uni := 0
+	for r in n:
+		var z := length * (float(r) / float(n - 1))
+		var hw := 0.0
+		if z >= float(st[0][0]) and z <= float(st[st.size() - 1][0]):
+			for k in st.size() - 1:
+				if z >= float(st[k][0]) and z <= float(st[k + 1][0]):
+					hw = lerpf(float(st[k][1]), float(st[k + 1][1]), (z - float(st[k][0])) / maxf(float(st[k + 1][0]) - float(st[k][0]), 1e-6))
+					break
+		for c in n:
+			var x := -span * 0.5 + span * (float(c) / float(n - 1))
+			var ax := absf(x)
+			var occ := ax <= hw
+			var surfaces: Array = (d["wings"] as Array).duplicate()
+			if not (d["htail"] as Dictionary).is_empty():
+				surfaces.append(d["htail"])
+			for w in surfaces:
+				var half := float(w["span"]) * 0.5
+				if ax <= half:
+					var le := float(w["z"]) + ax * tan(deg_to_rad(float(w["sweep"])))
+					var ch := lerpf(float(w["root"]), float(w["tip"]), clampf(ax / half, 0.0, 1.0))
+					if z >= le and z <= le + ch:
+						occ = true
+			for e in d["engines"]:
+				var nac: Dictionary = e.get("nacelle", {})
+				if not nac.is_empty():
+					var ep: Vector3 = e["pos"]
+					if absf(ax - absf(ep.x)) <= float(nac["r"]) and z >= ep.z and z <= ep.z + float(nac["len"]):
+						occ = true
+			var rv := String(ref[r]).substr(c, 1) == "1"
+			if occ and rv:
+				inter += 1
+			if occ or rv:
+				uni += 1
+	return float(inter) / float(maxi(uni, 1))
+
 # ---------------------------------------------------------------- specs / mass
 func t_spec_sheets() -> void:
 	var bad_env := []
@@ -185,6 +233,18 @@ func t_spec_sheets() -> void:
 		if (dd["engines"] as Array).size() != int(want[id][1]):
 			layout_bad.append("%s engines %d" % [id, (dd["engines"] as Array).size()])
 	_ok("scale: A-10 twin fins, F-22 twin canted fins, Concorde/747/C-130 four engines, F-16 single fin and engine", layout_bad.is_empty(), str(layout_bad))
+	# planform outline vs the silhouette of the real type's three-view top view (derived 40x40 occupancy grids in
+	# tests/reference_outlines.json; the drawings themselves are not in the repo)
+	var outl: Dictionary = JSON.parse_string(FileAccess.get_file_as_string("res://tests/reference_outlines.json"))
+	var floors := {"skylark": 0.82, "tundra_cub": 0.83, "belle51": 0.70, "specter22": 0.76, "brute10": 0.80, "striker16": 0.69, "macharrow": 0.73, "skyliner": 0.81, "cargo130": 0.77}
+	var bad_outline := []
+	var iou_txt := []
+	for id in floors:
+		var v := _outline_iou(AircraftDB.by_id(id), outl[id])
+		iou_txt.append("%s %.2f" % [id, v])
+		if v < float(floors[id]):
+			bad_outline.append("%s IoU %.2f < %.2f" % [id, v, floors[id]])
+	_ok("scale: planform outline overlaps the real type's three-view silhouette (IoU floors)", bad_outline.is_empty(), str(bad_outline) + " | " + ", ".join(iou_txt))
 	_ok("scale: aspect ratio of the replicas matches the real types within 12 %", bad_ar.is_empty(), str(bad_ar))
 	_ok("scale: length/span of the replicas matches the real types within 8 %", bad_ratio.is_empty(), str(bad_ratio))
 	_ok("specs: mass book-keeping adds up and inertia is physical", bad_mass.is_empty(), str(bad_mass))
