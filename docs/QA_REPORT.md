@@ -44,6 +44,7 @@ Date: 2026-09-26 · Build: 0.9.0 (versionCode 9) · Godot 4.7.2 stable · Jolt �
 - Carousel drag: cards no longer take the pointer, so a drag that ends over a card scrolls instead of selecting it; taps (under 18 px movement, under 0.7 s) select. New test covers tap, drag and long-hold.
 - Shader: aircraft skin now has bevelled panel-seam normals, rivet domes, brushed-metal streaking, orange-peel paint, airflow-aligned grime and soot, underside soiling, and edge sheen on foam/film/fabric, all gated by a graphics-quality global (off on Performance, on for High, stronger on Ultra); glass has faint scratches and uneven tint.
 - Real reference images (Wikimedia Commons, used only as study material, not shipped): 747-400, C-130 (3-view and photo), Concorde, P-51D (3-view, side, front), F-16 (3-view, profile), A-10 (3-view, photo). Cargomaster now has C-130 style main-gear sponsons, deeper boxy fuselage and underwing tanks.
+- Belle 51 (P-51D reference): boxy belly radiator scoop with dark inlet, chin carburettor scoop, dorsal fillet. Striker 16 (F-16 reference): dorsal spine added. Checked against the P-51D three-view (length/span 0.87), F-16 and A-10 three-views and photos.
 - Not yet done from the photos: re-modelling the P-51, F-16, A-10, Concorde and 747 outlines against the 3-views (only the C-130 was reworked this round), and no texture photos are used.
 
 ## Automated suite (`-- --test`): 28 / 28 PASS

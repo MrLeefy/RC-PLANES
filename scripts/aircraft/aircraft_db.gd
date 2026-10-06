@@ -285,7 +285,7 @@ static func _build() -> Array:
 			{"text": "RC-51", "z": 1.18, "y": 0.10, "size": 0.035, "color": Color(0.05, 0.05, 0.05), "vtail": true}],
 		"props": [_prop("16 x 10 (4-blade)", 16, 10, 4), _prop("18 x 8 (3-blade)", 18, 8, 3)],
 		"tank": 0.45, "fuel_type": "Glow (15% nitro)", "body_cd": 0.11, "gear_drag": 0.02, "strength": 1.3,
-		"details": {"scoop": true, "exhaust_stacks": 6},
+		"details": {"scoop": true, "scoop_z": 0.56, "chin_scoop": true, "dorsal_fillet": true, "exhaust_stacks": 6},
 	}))
 
 	# 8 ── Sport low-wing: Valor 46 (balsa, glow 2-stroke, tricycle)
@@ -384,7 +384,7 @@ static func _build() -> Array:
 		"cg": 0.25, "rates": {"ail": 15.0, "elev": 14.0, "rud": 18.0, "flap": 0.0},
 		"livery": {"scheme": "grey2", "base": Color(0.56, 0.58, 0.60), "a1": Color(0.40, 0.42, 0.45), "a2": Color(0.2, 0.2, 0.22)},
 		"labels": [{"text": "SW 520", "z": 1.95, "y": 0.35, "size": 0.07, "color": Color(0.12, 0.12, 0.13), "vtail": true}],
-		"tank": 2.8, "fuel_type": "Kerosene", "body_cd": 0.07, "gear_drag": 0.02, "strength": 1.8, "servo_speed": 380.0, "details": {"lerx": {"len": 0.62, "width": 0.16}},
+		"tank": 2.8, "fuel_type": "Kerosene", "body_cd": 0.07, "gear_drag": 0.02, "strength": 1.8, "servo_speed": 380.0, "details": {"lerx": {"len": 0.62, "width": 0.16}, "dorsal_fillet": true, "dorsal_h": 0.35},
 	}))
 
 	# 12 ── EDF: Specter 22 (F-22 style twin 70 mm)

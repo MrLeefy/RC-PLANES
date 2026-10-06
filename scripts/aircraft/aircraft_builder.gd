@@ -1725,15 +1725,60 @@ func _build_details() -> void:
 			var ak := _kit(_comp_part(core), "cockpit")
 			ak.add_cylinder(Vector3(0, fp[2] + fp[1] * 0.95, az), Vector3(0, fp[2] + fp[1] * 0.95 + length * 0.05, az + length * 0.02), 0.0015, 0.0008, 4, MeshKit.const_color(Color(0.05, 0.05, 0.05)), false, true)
 	if bool(det.get("scoop", false)):
-		var sz := length * 0.55
-		var fp2 := _fus_param(sz)
-		ck.add_ellipsoid(Vector3(0, fp2[2] - fp2[1] * 0.95, sz), Vector3(fp2[0] * 0.6, fp2[1] * 0.35, length * 0.13), 14, 8, _pfn("fus"))
+		# P-51 style belly radiator scoop: a deep, squared duct under the rear wing with a dark inlet and an exit flap
+		var sz := length * float(det.get("scoop_z", 0.55))
+		var sl := length * 0.17
+		var sfp := _fus_param(sz)
+		var rows_s := []
+		var ns := 10
+		for si in ns + 1:
+			var ts := float(si) / ns
+			var zz := sz - sl * 0.5 + sl * ts
+			var fpz := _fus_param(zz)
+			var depth := float(fpz[1]) * (0.42 * sin(PI * clampf(ts * 0.92 + 0.04, 0.0, 1.0)) + 0.08)
+			var wdt := float(fpz[0]) * (0.62 - 0.22 * ts)
+			var cy: float = float(fpz[2]) - float(fpz[1]) * 0.96 - depth * 0.35
+			var ring_s := PackedVector3Array()
+			for k in 16:
+				var aa := TAU * float(k) / 16.0
+				var ca := cos(aa)
+				var sa := sin(aa)
+				var ex := 4.0
+				ring_s.append(Vector3(signf(ca) * pow(absf(ca), 2.0 / ex) * wdt, cy + signf(sa) * pow(absf(sa), 2.0 / ex) * depth, zz))
+			rows_s.append(ring_s)
+		_grid_auto(ck, rows_s, true, _pfn("fus"))
 		var dk := _kit(_comp_part(core), "cockpit")
-		var ring := PackedVector3Array()
-		for i in 12:
-			var a := TAU * i / 12.0
-			ring.append(Vector3(cos(a) * fp2[0] * 0.45, fp2[2] - fp2[1] * 1.05 + sin(a) * fp2[1] * 0.18, sz - length * 0.1))
-		dk.add_cap(Vector3(0, fp2[2] - fp2[1] * 1.05, sz - length * 0.1), ring, Vector3(0, 0, -1), MeshKit.const_color(Color(0.02, 0.02, 0.02)))
+		var r0: PackedVector3Array = rows_s[0]
+		var c0 := _centroid(r0)
+		var inner := PackedVector3Array()
+		for q in r0:
+			inner.append(c0 + (q - c0) * 0.8 + Vector3(0, 0, 0.004))
+		dk.add_cap(c0 + Vector3(0, 0, 0.004), inner, Vector3(0, 0, -1), MeshKit.const_color(Color(0.02, 0.02, 0.02)))
+	if bool(det.get("chin_scoop", false)):
+		# carburettor air scoop under the cowl
+		var cz := length * 0.085
+		var cfp := _fus_param(cz)
+		ck.add_ellipsoid(Vector3(0, float(cfp[2]) - float(cfp[1]) * 0.86, cz), Vector3(float(cfp[0]) * 0.34, float(cfp[1]) * 0.22, length * 0.05), 14, 8, _pfn("cowl"))
+	if bool(det.get("dorsal_fillet", false)) and d["vtails"].size() > 0:
+		# dorsal fillet from behind the canopy blending into the fin
+		var v0: Dictionary = d["vtails"][0]
+		var z_f0: float = float(d["canopy"].get("z1", length * 0.5)) + 0.02
+		var z_f1: float = float(v0["z"]) + 0.03
+		var rows_f := []
+		var nf := 8
+		for fi in nf + 1:
+			var tf := float(fi) / nf
+			var zz := lerpf(z_f0, z_f1, tf)
+			var fpf := _fus_param(zz)
+			var h := float(fpf[1]) * (0.10 + 0.55 * pow(tf, 1.4)) * float(det.get("dorsal_h", 1.0))
+			var w2 := float(fpf[0]) * 0.10 * (1.0 - 0.5 * tf)
+			var y0: float = float(fpf[2]) + float(fpf[1]) * 0.98
+			var ring_f := PackedVector3Array()
+			for k in 10:
+				var aa := TAU * float(k) / 10.0
+				ring_f.append(Vector3(cos(aa) * w2, y0 + (sin(aa) * 0.5 + 0.5) * h - h * 0.15, zz))
+			rows_f.append(ring_f)
+		_grid_auto(ck, rows_f, true, _pfn("fus"))
 	if bool(det.get("gun", false)):
 		var mk2 := _kit(_comp_part(core), "metalbare")
 		mk2.add_cylinder(Vector3(0, -0.02, -0.03), Vector3(0, -0.02, 0.02), 0.006, 0.006, 8, MeshKit.const_color(_lin(Color(0.2, 0.2, 0.2), 0.0)), true, true)
