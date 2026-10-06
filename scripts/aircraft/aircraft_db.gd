@@ -510,8 +510,8 @@ static func _build() -> Array:
 			[0.60, 0.07, 0.075, 0.0, 2.0], [1.50, 0.07, 0.075, 0.0, 2.0], [1.85, 0.05, 0.06, 0.01, 2.0],
 			[2.05, 0.012, 0.03, 0.02, 2.0]],
 		"canopy": {"z0": 0.22, "z1": 0.36, "hw": 0.045, "hh": 0.02, "y": 0.052, "style": "airliner", "tint": Color(0.05, 0.06, 0.08)},
-		"wings": [_wing(0.78, -0.05, 0.92, 1.05, 0.06, {"dihedral": 0.0, "incidence": 3.0, "washout": 0.0, "thick": 0.035,
-			"camber": 0.0, "ail": [0.12, 0.92, 0.3], "flap": [], "sweep": 58.0, "tip_style": "square", "elevon": true, "stall_deg": 32.0, "x0": 0.06, "ogive": 0.45})],
+		"wings": [_wing(0.737, -0.05, 0.92, 0.930, 0.069, {"dihedral": 0.0, "incidence": 3.0, "washout": 0.0, "thick": 0.035,
+			"camber": 0.0, "ail": [0.12, 0.92, 0.3], "flap": [], "sweep": 58.1, "tip_style": "square", "elevon": true, "stall_deg": 32.0, "x0": 0.06, "ogive": 0.45})],
 		"htail": {},
 		"vtails": [_vtail(1.45, 0.07, 0.34, 0.52, 0.14, {"sweep": 55.0, "rudder_cf": 0.3})],
 		"engines": [
@@ -521,8 +521,8 @@ static func _build() -> Array:
 			_edf(Vector3(0.22, -0.10, 1.55), 64.0, 10.5, 48.0, 38.0, 0.2, {"intake": "box", "nacelle": {"len": 0.40, "r": 0.04, "box": true}, "spin": -1})],
 		"gear": {"type": "tricycle", "retract": true, "wheels": [
 			_wheel(0, -0.26, 0.45, 0.026, {"len": 0.20, "steer": true, "style": "oleo", "brake": false, "twin": true}),
-			_wheel(-0.16, -0.25, 1.23, 0.032, {"len": 0.19, "style": "bogie"}),
-			_wheel(0.16, -0.25, 1.23, 0.032, {"len": 0.19, "style": "bogie"})]},
+			_wheel(-0.16, -0.25, 1.18, 0.032, {"len": 0.19, "style": "bogie"}),
+			_wheel(0.16, -0.25, 1.18, 0.032, {"len": 0.19, "style": "bogie"})]},
 		"cg": 0.17, "rates": {"ail": 20.0, "elev": 26.0, "rud": 20.0, "flap": 0.0},
 		"livery": {"scheme": "sst", "base": Color(0.98, 0.98, 0.99), "a1": Color(0.08, 0.14, 0.42), "a2": Color(0.80, 0.08, 0.12)},
 		"labels": [{"text": "MACH ARROW", "z": 0.70, "y": 0.03, "size": 0.04, "color": Color(0.08, 0.14, 0.42)}],
