@@ -90,6 +90,13 @@ Date: 2026-09-26 · Build: 0.9.0 (versionCode 9) · Godot 4.7.2 stable · Jolt �
 - Cost: fleet triangles 991k -> 1.01M (+2 %).
 - Not done: no change to the overall shape of Viper 90 (smooth blob fuselage), no wing-root fillets, no riveted panel layout on foam/film models, and the engines hidden behind the cowl cap are not visible from outside. Judged from software-rendered close-ups only.
 
+### Model connection / overlap audit (2026-10-07)
+- New dev tool `tests/conn_check.tscn` plus regression test "model: no floating nacelles, every gear leg reaches the airframe, no overlapping wheels (16 aircraft)". Checks: component bounding boxes vs their parent, gear-leg tops vs airframe parts, wheel-vs-wheel overlap, propeller discs vs wings/tail/fuselage.
+- Found and fixed: Mach Arrow engine nacelles hung about 5 cm behind the wing trailing edge (moved forward under the wing); Skyliner main-gear legs sat behind the wing trailing edge and beyond the fuselage width (moved to under the wing root, z 0.90/0.94); main-gear leg tops that ended in air ahead of / outboard of the wing (Belle 51, Striker 16, Skylark nose, Skipper) now end in a fairing strut and knuckle on the nearest airframe surface.
+- Checked and fine: biplane upper-wing gap (cabane struts), wheel and propeller overlaps (none), tail and fin joints in rear/underside renders of all 16.
+- Not covered: overlap between arbitrary parts (e.g. decals through skin, strut ends inside wings), fracture-face geometry, anything on a real device. The checks use axis-aligned bounding boxes, so a leg can pass the test and still look slightly off on a thin wing.
+- Also this round: smoother fabric/paint normals (no quilted look) and a sharper Viper 90 nose.
+
 ## Automated suite (`-- --test`): 28 / 28 PASS
 - **PASS** transmitter: Linear preset is exactly linear
 - **PASS** transmitter: expo softens centre

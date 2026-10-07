@@ -32,6 +32,7 @@ func _run_all() -> void:
 	await t_audio_families()
 	await t_hangar_input()
 	await t_hangar_cache()
+	t_model_connections()
 	t_spec_sheets()
 	var only := OS.get_environment("RT_ONLY")
 	for id in AircraftDB.ids():
@@ -199,6 +200,48 @@ func _side_rms(d: Dictionary, ref: Array) -> float:
 	for x in diffs:
 		ss += (float(x) - med) * (float(x) - med)
 	return sqrt(ss / float(diffs.size())) * 100.0
+
+## Geometry sanity for every model: no floating engine nacelles, every landing-gear leg reaches the airframe (directly or
+## through its fairing strut), no two wheels overlap.
+func t_model_connections() -> void:
+	var bad := []
+	for d in AircraftDB.all():
+		var b := AircraftBuilder.new()
+		var r := b.build(d, {"battery": 0, "prop": 0, "cg": 0.0, "throws": "high", "fuel": 1.0}, 2)
+		var comps: Array = r["comps"]
+		for c in comps:
+			if String(c["kind"]) != "nacelle" or (c["aabb_min"] as Vector3).x > 1e8:
+				continue
+			var par: Dictionary = comps[int(c["parent"])]
+			var pmn: Vector3 = par["aabb_min"]
+			var pmx: Vector3 = par["aabb_max"]
+			var cmn: Vector3 = c["aabb_min"]
+			var cmx: Vector3 = c["aabb_max"]
+			var gap := Vector3(maxf(maxf(cmn.x - pmx.x, pmn.x - cmx.x), 0.0), maxf(maxf(cmn.y - pmx.y, pmn.y - cmx.y), 0.0), maxf(maxf(cmn.z - pmx.z, pmn.z - cmx.z), 0.0)).length()
+			if gap > 0.006:
+				bad.append("%s %s floats %.0f mm off %s" % [d["id"], c["id"], gap * 1000.0, par["id"]])
+		for w in r["wheels"]:
+			var top: Vector3 = w["top"]
+			var best := 1e9
+			for c in comps:
+				if not String(c["kind"]) in ["fuselage", "wing", "wingtip", "nacelle", "engine"] or (c["aabb_min"] as Vector3).x > 1e8:
+					continue
+				var mn: Vector3 = (c["aabb_min"] as Vector3) + Vector3(0.004, 0.004, 0.004)
+				var mx: Vector3 = (c["aabb_max"] as Vector3) - Vector3(0.004, 0.004, 0.004)
+				if mn.x > mx.x or mn.y > mx.y or mn.z > mx.z:
+					continue
+				best = minf(best, Vector3(clampf(top.x, mn.x, mx.x), clampf(top.y, mn.y, mx.y), clampf(top.z, mn.z, mx.z)).distance_to(top))
+			if best > 0.14:
+				bad.append("%s wheel leg top %.0f mm from any airframe part" % [d["id"], best * 1000.0])
+		var wl: Array = r["wheels"]
+		for i in wl.size():
+			for j in range(i + 1, wl.size()):
+				var ci: Vector3 = wl[i]["center"]
+				var cj: Vector3 = wl[j]["center"]
+				if absf(ci.x - cj.x) < 0.5 * (float(wl[i]["w"]) + float(wl[j]["w"])) and Vector2(ci.y - cj.y, ci.z - cj.z).length() < float(wl[i]["r"]) + float(wl[j]["r"]) - 0.002:
+					bad.append("%s wheels %d and %d overlap" % [d["id"], i, j])
+		r["root"].free()
+	_ok("model: no floating nacelles, every gear leg reaches the airframe, no overlapping wheels (16 aircraft)", bad.is_empty(), str(bad))
 
 # ---------------------------------------------------------------- specs / mass
 func t_spec_sheets() -> void:

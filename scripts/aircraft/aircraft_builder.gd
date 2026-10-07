@@ -73,6 +73,7 @@ func build(def: Dictionary, config: Dictionary, detail := 2) -> Dictionary:
 		gi += 1
 	_build_details()
 	_build_detail_pack()
+	_connect_gear_tops()
 	_build_body_panels()
 	_assign_masses()
 	_build_shapes()
@@ -1956,6 +1957,32 @@ func _build_details() -> void:
 					var nu := Vector3(side, 0.25, 0).normalized()
 					wku.add_quad(pu + Vector3(0, -0.0045, -0.0036), pu + Vector3(0, -0.0045, 0.0036), pu + Vector3(0, 0.0045, 0.0036), pu + Vector3(0, 0.0045, -0.0036), Color(0.03, 0.04, 0.06), true, nu)
 				zu += 0.0185
+
+## Landing-gear legs whose top ends in air (the axle sits ahead of / outboard of the structure it hangs from) get a short
+## fairing strut from the leg top to the nearest airframe surface, so no leg floats.
+func _connect_gear_tops() -> void:
+	for w in wheels:
+		var top: Vector3 = w["top"]
+		var best_d := 1e9
+		var best_p := top
+		for ci in comps.size():
+			var cc: Dictionary = comps[ci]
+			if not String(cc["kind"]) in ["fuselage", "wing", "wingtip", "nacelle", "engine"]:
+				continue
+			var mn: Vector3 = (cc["aabb_min"] as Vector3) + Vector3(0.004, 0.004, 0.004)
+			var mx: Vector3 = (cc["aabb_max"] as Vector3) - Vector3(0.004, 0.004, 0.004)
+			if mn.x > mx.x or mn.y > mx.y or mn.z > mx.z:
+				continue
+			var q := Vector3(clampf(top.x, mn.x, mx.x), clampf(top.y, mn.y, mx.y), clampf(top.z, mn.z, mx.z))
+			var dd := q.distance_to(top)
+			if dd < best_d:
+				best_d = dd
+				best_p = q
+		if best_d > 0.006 and best_d < 0.14:
+			var gk := _kit(int(w["retract_part"]) if w.has("retract_part") else _comp_part(int(cidx["fuselage"])), "metalbare")
+			var r_s: float = maxf(float(w["r"]) * 0.16, 0.0035)
+			gk.add_cylinder(top, best_p, r_s, r_s * 0.85, 6, MeshKit.const_color(_lin(Color(0.5, 0.5, 0.54), 0.0)), true, true)
+			gk.add_ellipsoid(best_p, Vector3(r_s * 2.2, r_s * 1.6, r_s * 2.2), 8, 5, MeshKit.const_color(_lin(Color(0.5, 0.5, 0.54), 0.0)), Basis(), true)
 
 # ---------------------------------------------------------------- detail pack (fleet-wide small parts)
 ## Small real-aircraft details added to every model at medium/high detail: cockpit interior, cowl fasteners, exhausts,
