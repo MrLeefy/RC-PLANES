@@ -34,7 +34,9 @@ The original 16 aircraft remain useful as physics/aerodynamic references. Their 
 
 At runtime `AircraftBakedLibrary` reconstructs the live references from NodePaths. When an exact baked resource is present, `Aircraft.setup()` does **not instantiate AircraftBuilder at all**.
 
-Non-default workshop variants currently fall back to the procedural path until the lightweight configuration-delta layer is implemented. This is deliberate: correctness wins over silently using stale mass/CG/prop data.
+All 16 default-detail models now ship saved scene/blueprint pairs. Workshop battery, propeller, fuel, CG and throws use a data-only configuration layer. Gear assemblies and collision data translate with CG to preserve the legacy ballast solution; no mesh generation is needed. Missing assets or non-default detail levels retain the procedural fallback.
+
+These are the original stylized RC designs saved as premade resources, not exact real-aircraft replicas or newly authored high-detail models. The baseline geometry is fixed independently of the small RCBeam cage. Cage deformation updates render component transforms and aerodynamic panel positions/normals/area; attachment fracture removes lift and control authority on the parent.
 
 ## Measured proof of concept
 

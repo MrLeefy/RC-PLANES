@@ -129,6 +129,9 @@ public:
     const std::vector<Node>& nodes() const { return nodes_; }
     const std::vector<Beam>& beams() const { return beams_; }
 
+    const std::vector<std::uint32_t>& break_events() const { return break_events_; }
+    void clear_break_events() { break_events_.clear(); }
+
     std::vector<std::uint32_t> consume_break_events();
 
 private:
@@ -137,6 +140,7 @@ private:
     std::vector<Node> nodes_{};
     std::vector<Beam> beams_{};
     std::vector<Vec3> forces_{};
+    std::vector<Vec3> external_forces_{};
 
     // Reused buffers: no allocations in the steady-state step path after reserve.
     std::vector<std::uint16_t> triggered_break_groups_{};

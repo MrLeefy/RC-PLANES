@@ -60,6 +60,13 @@ public:
     void notify_impact(double normalized_severity);
 
     Dictionary step(double dt_seconds, Vector3 external_acceleration_mps2 = Vector3(0.0, -9.81, 0.0));
+    int step_fast(double dt_seconds);
+    Vector3 get_node_position(int node) const;
+    bool is_beam_broken(int beam) const;
+    double get_beam_rest_length(int beam) const;
+    int get_break_event_count() const;
+    int get_break_event(int event) const;
+    void clear_break_events();
 
     PackedVector3Array get_node_positions() const;
     PackedVector3Array get_node_velocities() const;
@@ -82,3 +89,5 @@ private:
 };
 
 } // namespace godot
+
+VARIANT_ENUM_CAST(godot::RCBeamSolver::MaterialPreset);

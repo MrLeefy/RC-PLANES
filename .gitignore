@@ -8,3 +8,11 @@ exports/
 *.jks
 *.log
 .DS_Store
+native/rcbeam/godot/godot-cpp/
+native/rcbeam/godot/bin/
+native/rcbeam/godot/.sconsign*
+*.o
+*.obj
+*.os
+addons/rcbeam/bin/
+addons/rcbeam/rcbeam.gdextension

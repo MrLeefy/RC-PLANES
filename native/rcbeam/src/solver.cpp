@@ -142,17 +142,18 @@ Material material_preset(MaterialKind kind) {
 }
 
 Solver::Solver(SolverConfig config) : config_(config) {
-    config_.normal_substeps = std::max<std::uint32_t>(1, config_.normal_substeps);
-    config_.impact_substeps = std::max<std::uint32_t>(config_.normal_substeps, config_.impact_substeps);
-    config_.max_substeps = std::max<std::uint32_t>(config_.impact_substeps, config_.max_substeps);
+    config_.max_substeps = std::clamp<std::uint32_t>(config_.max_substeps, 1, 8);
+    config_.normal_substeps = std::clamp<std::uint32_t>(config_.normal_substeps, 1, config_.max_substeps);
+    config_.impact_substeps = std::clamp(config_.impact_substeps, config_.normal_substeps, config_.max_substeps);
 }
 
 void Solver::reserve(std::size_t node_capacity, std::size_t beam_capacity) {
     nodes_.reserve(node_capacity);
     forces_.reserve(node_capacity);
+    external_forces_.reserve(node_capacity);
     beams_.reserve(beam_capacity);
     break_events_.reserve(beam_capacity);
-    triggered_break_groups_.reserve(std::min<std::size_t>(beam_capacity, 64));
+    triggered_break_groups_.reserve(beam_capacity);
 }
 
 std::uint32_t Solver::add_node(Vec3 position, float mass_kg, bool pinned) {
@@ -167,6 +168,7 @@ std::uint32_t Solver::add_node(Vec3 position, float mass_kg, bool pinned) {
 
     nodes_.push_back(node);
     forces_.push_back({});
+    external_forces_.push_back({});
     return static_cast<std::uint32_t>(nodes_.size() - 1);
 }
 
@@ -201,14 +203,15 @@ void Solver::clear() {
     nodes_.clear();
     beams_.clear();
     forces_.clear();
+    external_forces_.clear();
     triggered_break_groups_.clear();
     break_events_.clear();
     impact_timer_ = 0.0f;
 }
 
 void Solver::apply_force(std::uint32_t node, Vec3 force_n) {
-    if (node < forces_.size()) {
-        forces_[node] += force_n;
+    if (node < external_forces_.size()) {
+        external_forces_[node] += force_n;
     }
 }
 
@@ -230,15 +233,22 @@ void Solver::apply_radial_impulse(Vec3 center, Vec3 impulse_ns, float radius_m) 
     }
 
     const float inv_radius = 1.0f / radius_m;
+    float total_weight = 0.0f;
+    for (const Node& n : nodes_) {
+        if (!n.pinned) {
+            total_weight += std::max(0.0f, 1.0f - length(n.position - center) * inv_radius);
+        }
+    }
+    if (total_weight <= kEpsilon) return;
     for (std::uint32_t i = 0; i < nodes_.size(); ++i) {
         const Vec3 offset = nodes_[i].position - center;
         const float d = length(offset);
-        if (d >= radius_m) {
+        if (d >= radius_m || nodes_[i].pinned) {
             continue;
         }
 
         const float falloff = 1.0f - d * inv_radius;
-        apply_impulse(i, impulse_ns * falloff);
+        apply_impulse(i, impulse_ns * (falloff / total_weight));
     }
 }
 
@@ -288,7 +298,7 @@ void Solver::trigger_break_group(std::uint16_t group, StepStats& stats) {
 
 StepStats Solver::step(float dt_seconds, Vec3 external_acceleration_mps2) {
     StepStats stats{};
-    if (dt_seconds <= 0.0f || nodes_.empty()) {
+    if (!std::isfinite(dt_seconds) || dt_seconds <= 0.0f || dt_seconds > 1.0f / 30.0f || nodes_.empty()) {
         return stats;
     }
 
@@ -306,9 +316,7 @@ StepStats Solver::step(float dt_seconds, Vec3 external_acceleration_mps2) {
     const float velocity_damping = 1.0f / (1.0f + config_.global_velocity_damping * h);
 
     for (std::uint32_t sub = 0; sub < substeps; ++sub) {
-        // Keep externally applied force for the first substep only; gravity is
-        // regenerated every substep. This makes host forces frame-based and
-        // avoids multiplying them by the structural substep count.
+        // Forces are in newtons and act for the entire host interval.
         for (std::uint32_t i = 0; i < nodes_.size(); ++i) {
             Node& node = nodes_[i];
             if (node.pinned) {
@@ -317,7 +325,7 @@ StepStats Solver::step(float dt_seconds, Vec3 external_acceleration_mps2) {
             }
 
             const float mass = 1.0f / node.inverse_mass;
-            forces_[i] += external_acceleration_mps2 * mass;
+            forces_[i] = external_forces_[i] + external_acceleration_mps2 * mass;
         }
 
         triggered_break_groups_.clear();
@@ -424,14 +432,14 @@ StepStats Solver::step(float dt_seconds, Vec3 external_acceleration_mps2) {
     }
 
     impact_timer_ = std::max(0.0f, impact_timer_ - dt_seconds);
+    std::fill(external_forces_.begin(), external_forces_.end(), Vec3{});
     return stats;
 }
 
 std::vector<std::uint32_t> Solver::consume_break_events() {
     std::vector<std::uint32_t> out;
-    out.swap(break_events_);
-    // Keep the hot buffer capacity for future events.
-    break_events_.reserve(beams_.capacity());
+    out.assign(break_events_.begin(), break_events_.end());
+    break_events_.clear();
     return out;
 }
 

@@ -222,6 +222,19 @@ func setup(definition: Dictionary, config: Dictionary, detail_level := 2, for_di
 	_ray_params.collision_mask = Game.L_WORLD | Game.L_NPC
 	_ray_params.exclude = [get_rid()]
 	_ray_params.hit_from_inside = false
+	if not display_only and bool(cfg.get("rcbeam", false)):
+		enable_structure_proof()
+
+var structure: AircraftStructure
+
+func enable_structure_proof() -> bool:
+	if structure != null:
+		structure.reset_aero()
+	var proof := AircraftStructure.new()
+	if not proof.setup(self):
+		return false
+	structure = proof
+	return true
 
 func _setup_power() -> void:
 	var t := String(def["engines"][0]["type"])
@@ -615,6 +628,8 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	_gear(state, dt, xf, com_w, v_w, w_w, space)
 	# ---- contacts -> damage ----
 	_contacts(state)
+	if structure != null:
+		structure.step(dt)
 	on_ground = wheels_touching > 0 or _body_ground_contact
 	if on_ground:
 		ground_time += dt
@@ -719,7 +734,7 @@ func _aero(v_l: Vector3, w_l: Vector3, wind_l: Vector3, wind_tip_l: Vector3, ge_
 		var dal_f := 0.0
 		var cdc := 0.0
 		var cmc := 0.0
-		var area_f := float(p["eff"])
+		var area_f := float(p["eff"]) * float(p.get("structure_eff", 1.0))
 		for c in p["ctrls"]:
 			var s: Dictionary = surfaces[int(c["surf"])]
 			if s["dead"]:
@@ -1258,6 +1273,8 @@ func _contacts(state: PhysicsDirectBodyState3D) -> void:
 		var closing := maxf(-v_rel.dot(n), 0.0)
 		var J := state.get_contact_impulse(i).length()
 		var pos := state.get_contact_collider_position(i)
+		if structure != null and contact_grace <= 0:
+			structure.contact(pos, state.get_contact_impulse(i), state.transform)
 		var collider := state.get_contact_collider_object(i)
 		var tang := contact_tangent(v_rel, n).length()
 		# A lateral obstacle impact is not support beneath the aircraft.
@@ -1451,6 +1468,8 @@ func _process_detach_queue() -> void:
 func detach(ci: int, info := {}) -> void:
 	if comps[ci]["detached"] or ci == 0:
 		return
+	if structure != null and structure._debris_count() >= AircraftStructure.MAX_ACTIVE_DEBRIS:
+		return
 	var group = [ci]
 	for dsc in _descendants(ci):
 		if not comps[dsc]["detached"]:
@@ -1555,6 +1574,8 @@ func _crash(info: Dictionary) -> void:
 
 # ================================================================ repair / reset
 func repair_all() -> void:
+	if structure != null:
+		enable_structure_proof()
 	for ci in comps.size():
 		var c: Dictionary = comps[ci]
 		c["hp"] = 1.0
@@ -1697,6 +1718,11 @@ func snapshot() -> Dictionary:
 		"wind_t": Game.wind.t if Game.wind else 0.0}
 
 func restore(s: Dictionary) -> void:
+	# Structural rewind is not yet serialized: return to the legacy renderer and
+	# damage path instead of retaining future deformation in a restored snapshot.
+	if structure != null:
+		structure.reset_aero()
+	structure = null
 	# re-attach anything that broke after the snapshot
 	for ci in comps.size():
 		var was_det := int(s["det"][ci]) == 1
@@ -1827,9 +1853,11 @@ func update_visuals(xf: Transform3D, delta: float) -> void:
 			else:
 				vis.visible = false
 		else:
-			vis.transform = Transform3D()
+			vis.transform = c.get("config_transform", Transform3D.IDENTITY)
 			vis.visible = true
 	_animate(delta)
+	if structure != null:
+		structure.deform_visuals(xf)
 
 func _animate(delta: float) -> void:
 	for cut in build.get("fractures", []):
@@ -1943,6 +1971,8 @@ func health_summary() -> Array:
 
 # ================================================================ secondary breakup
 func split_debris(rb: RigidBody3D, sev: float) -> void:
+	if structure != null and structure._debris_count() >= AircraftStructure.MAX_ACTIVE_DEBRIS:
+		return
 	var members: Array = rb.get_meta("members", [])
 	var owner_ci := int(rb.get_meta("ci"))
 	var cands = []

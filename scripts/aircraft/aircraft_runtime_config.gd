@@ -30,6 +30,7 @@ static func apply(build: Dictionary, definition: Dictionary, cfg: Dictionary) ->
 	var c_mac := float(mac["c"])
 	var zle := float(mac["zle"])
 	var z_target := zle + (float(definition["cg"]) + float(cfg.get("cg", 0.0))) * c_mac
+	_update_gear_positions(build, definition, z_target, length)
 	var etype := String(definition["engines"][0]["type"])
 
 	# Prop selection changes propulsion physics, not the static airframe mesh.
@@ -245,3 +246,33 @@ static func _update_gear_springs(wheels: Array, total_mass: float, cg_z: float) 
 		w["k"] = k
 		w["c"] = 2.0 * 0.55 * sqrt(k * load / 9.81)
 		w["load"] = load
+
+static func _update_gear_positions(build: Dictionary, definition: Dictionary, target_z: float, length: float) -> void:
+	# Legacy gear follows Workshop CG. Move the premade assembly and its data;
+	# this requires no mesh generation and retains the original ballast solution.
+	var definitions: Array = definition["gear"]["wheels"]
+	var wheels: Array = build["wheels"]
+	var tricycle := String(definition["gear"]["type"]) == "tricycle"
+	for i in mini(wheels.size(), definitions.size()):
+		var wd: Dictionary = definitions[i]
+		var wheel: Dictionary = wheels[i]
+		var z := float(wd["z"])
+		if tricycle and not bool(wd["steer"]):
+			z = maxf(z, target_z + length * 0.055)
+		elif not tricycle and not bool(wd["tail"]):
+			z = minf(z, target_z - length * 0.06)
+		var offset := Vector3(0, 0, z - (wheel["center"] as Vector3).z)
+		wheel["center"] = (wheel["center"] as Vector3) + offset
+		wheel["top"] = (wheel["top"] as Vector3) + offset
+		var comp: Dictionary = build["comps"][int(wheel["comp"])]
+		comp["center"] = (comp["center"] as Vector3) + offset
+		comp["aabb_min"] = (comp["aabb_min"] as Vector3) + offset
+		comp["aabb_max"] = (comp["aabb_max"] as Vector3) + offset
+		comp["config_transform"] = Transform3D(Basis.IDENTITY, offset)
+		(comp["visual"] as Node3D).transform = comp["config_transform"]
+		for pm in comp["point_masses"]:
+			pm["pos"] = (pm["pos"] as Vector3) + offset
+		for shape in comp["shapes"]:
+			var transform: Transform3D = shape["xf"]
+			transform.origin += offset
+			shape["xf"] = transform

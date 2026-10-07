@@ -50,6 +50,10 @@ func start(id: String, mode_id: String, f: Field, effects: Fx, camera: CameraRig
 	var def := AircraftDB.by_id(id)
 	aircraft = Aircraft.new()
 	aircraft.setup(def, Settings.aircraft_cfg(id), 2, false)
+	# Developer-only proof: launch with -- --rcbeam-proof, then fly any model.
+	if "--rcbeam-proof" in OS.get_cmdline_user_args():
+		if not aircraft.enable_structure_proof():
+			push_warning("RCBeam proof unavailable; build/install the host extension first.")
 	aircraft.assist = String(Settings.g("gameplay", "assist", "sport"))
 	aircraft.damage_mode = String(Settings.g("gameplay", "damage", "physical"))
 	add_child(aircraft)

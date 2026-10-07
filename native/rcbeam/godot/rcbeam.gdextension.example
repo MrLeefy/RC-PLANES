@@ -8,6 +8,8 @@ reloadable = false
 
 linux.debug.x86_64 = "res://addons/rcbeam/bin/linux/librcbeam.linux.template_debug.x86_64.so"
 linux.release.x86_64 = "res://addons/rcbeam/bin/linux/librcbeam.linux.template_release.x86_64.so"
+linux.debug.arm64 = "res://addons/rcbeam/bin/linux/librcbeam.linux.template_debug.arm64.so"
+linux.release.arm64 = "res://addons/rcbeam/bin/linux/librcbeam.linux.template_release.arm64.so"
 
 windows.debug.x86_64 = "res://addons/rcbeam/bin/windows/rcbeam.windows.template_debug.x86_64.dll"
 windows.release.x86_64 = "res://addons/rcbeam/bin/windows/rcbeam.windows.template_release.x86_64.dll"

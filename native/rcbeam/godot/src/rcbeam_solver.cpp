@@ -34,9 +34,9 @@ void RCBeamSolver::configure(
     double impact_hold_seconds,
     double impact_trigger
 ) {
-    config_.normal_substeps = static_cast<std::uint32_t>(std::max(normal_substeps, 1));
-    config_.impact_substeps = static_cast<std::uint32_t>(std::max(impact_substeps, normal_substeps));
-    config_.max_substeps = static_cast<std::uint32_t>(std::max(max_substeps, impact_substeps));
+    config_.max_substeps = static_cast<std::uint32_t>(std::clamp(max_substeps, 1, 8));
+    config_.normal_substeps = static_cast<std::uint32_t>(std::clamp(normal_substeps, 1, static_cast<int>(config_.max_substeps)));
+    config_.impact_substeps = static_cast<std::uint32_t>(std::clamp(impact_substeps, static_cast<int>(config_.normal_substeps), static_cast<int>(config_.max_substeps)));
     config_.impact_hold_seconds = static_cast<float>(std::max(impact_hold_seconds, 0.0));
     config_.impact_trigger = static_cast<float>(std::clamp(impact_trigger, 0.0, 1.0));
     solver_ = rcbeam::Solver(config_);
@@ -153,6 +153,31 @@ PackedVector3Array RCBeamSolver::get_node_positions() const {
     return out;
 }
 
+int RCBeamSolver::step_fast(double dt_seconds) {
+    return static_cast<int>(solver_.step(static_cast<float>(dt_seconds), {}).substeps);
+}
+
+Vector3 RCBeamSolver::get_node_position(int node) const {
+    if (node < 0 || static_cast<std::size_t>(node) >= solver_.nodes().size()) return {};
+    return to_godot(solver_.nodes()[node].position);
+}
+
+bool RCBeamSolver::is_beam_broken(int beam) const {
+    return beam >= 0 && static_cast<std::size_t>(beam) < solver_.beams().size() && solver_.beams()[beam].broken;
+}
+
+double RCBeamSolver::get_beam_rest_length(int beam) const {
+    if (beam < 0 || static_cast<std::size_t>(beam) >= solver_.beams().size()) return 0.0;
+    return solver_.beams()[beam].rest_length;
+}
+
+int RCBeamSolver::get_break_event_count() const { return static_cast<int>(solver_.break_events().size()); }
+int RCBeamSolver::get_break_event(int event) const {
+    if (event < 0 || static_cast<std::size_t>(event) >= solver_.break_events().size()) return -1;
+    return static_cast<int>(solver_.break_events()[event]);
+}
+void RCBeamSolver::clear_break_events() { solver_.clear_break_events(); }
+
 PackedVector3Array RCBeamSolver::get_node_velocities() const {
     PackedVector3Array out;
     out.resize(static_cast<int64_t>(solver_.nodes().size()));
@@ -196,6 +221,13 @@ int RCBeamSolver::get_beam_count() const {
 }
 
 void RCBeamSolver::_bind_methods() {
+    ClassDB::bind_method(D_METHOD("step_fast", "dt_seconds"), &RCBeamSolver::step_fast);
+    ClassDB::bind_method(D_METHOD("get_node_position", "node"), &RCBeamSolver::get_node_position);
+    ClassDB::bind_method(D_METHOD("is_beam_broken", "beam"), &RCBeamSolver::is_beam_broken);
+    ClassDB::bind_method(D_METHOD("get_beam_rest_length", "beam"), &RCBeamSolver::get_beam_rest_length);
+    ClassDB::bind_method(D_METHOD("get_break_event_count"), &RCBeamSolver::get_break_event_count);
+    ClassDB::bind_method(D_METHOD("get_break_event", "event"), &RCBeamSolver::get_break_event);
+    ClassDB::bind_method(D_METHOD("clear_break_events"), &RCBeamSolver::clear_break_events);
     ClassDB::bind_method(D_METHOD(
         "configure",
         "normal_substeps",
