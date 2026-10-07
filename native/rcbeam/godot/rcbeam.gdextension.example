@@ -1,0 +1,16 @@
+[configuration]
+
+entry_symbol = "rcbeam_library_init"
+compatibility_minimum = "4.7"
+reloadable = false
+
+[libraries]
+
+linux.debug.x86_64 = "res://addons/rcbeam/bin/linux/librcbeam.linux.template_debug.x86_64.so"
+linux.release.x86_64 = "res://addons/rcbeam/bin/linux/librcbeam.linux.template_release.x86_64.so"
+
+windows.debug.x86_64 = "res://addons/rcbeam/bin/windows/rcbeam.windows.template_debug.x86_64.dll"
+windows.release.x86_64 = "res://addons/rcbeam/bin/windows/rcbeam.windows.template_release.x86_64.dll"
+
+android.debug.arm64 = "res://addons/rcbeam/bin/android/librcbeam.android.template_debug.arm64.so"
+android.release.arm64 = "res://addons/rcbeam/bin/android/librcbeam.android.template_release.arm64.so"
