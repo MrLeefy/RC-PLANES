@@ -12,11 +12,10 @@ extends Resource
 @export var source_detail := 2
 @export var format_version := 1
 
-static func capture(source_build: Dictionary, drag: Dictionary, root: Node3D, aircraft_id: String, detail: int):
-	var bp := AircraftBakedBlueprint.new()
-	bp.source_aircraft_id = aircraft_id
-	bp.source_detail = detail
-	bp.body_drag = drag.duplicate(true)
+func capture(source_build: Dictionary, drag: Dictionary, root: Node3D, aircraft_id: String, detail: int) -> void:
+	source_aircraft_id = aircraft_id
+	source_detail = detail
+	body_drag = drag.duplicate(true)
 
 	var clean := {}
 	for key in source_build.keys():
@@ -28,7 +27,7 @@ static func capture(source_build: Dictionary, drag: Dictionary, root: Node3D, ai
 	for comp in source_build["comps"]:
 		var c: Dictionary = (comp as Dictionary).duplicate(true)
 		var visual := c.get("visual") as Node
-		bp.component_paths.append(root.get_path_to(visual) if visual else NodePath(""))
+		component_paths.append(root.get_path_to(visual) if visual else NodePath(""))
 		c.erase("visual")
 		comps_out.append(c)
 	clean["comps"] = comps_out
@@ -37,7 +36,7 @@ static func capture(source_build: Dictionary, drag: Dictionary, root: Node3D, ai
 	for part in source_build["parts"]:
 		var p: Dictionary = part as Dictionary
 		var node := p.get("node") as Node
-		bp.part_paths.append(root.get_path_to(node) if node else NodePath(""))
+		part_paths.append(root.get_path_to(node) if node else NodePath(""))
 		# Runtime animation only needs the node, origin and owning component.
 		parts_out.append({
 			"origin": p.get("origin", Vector3.ZERO),
@@ -51,12 +50,12 @@ static func capture(source_build: Dictionary, drag: Dictionary, root: Node3D, ai
 		var paths := []
 		for n in f.get("nodes", []):
 			paths.append(root.get_path_to(n as Node))
-		bp.fracture_node_paths.append(paths)
+		fracture_node_paths.append(paths)
 		f.erase("nodes")
 		fractures_out.append(f)
 	clean["fractures"] = fractures_out
 
-	bp.build_data = clean
+	build_data = clean
 	return bp
 
 func instantiate_build(root: Node3D) -> Dictionary:
