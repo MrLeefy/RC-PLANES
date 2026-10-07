@@ -56,7 +56,6 @@ func capture(source_build: Dictionary, drag: Dictionary, root: Node3D, aircraft_
 	clean["fractures"] = fractures_out
 
 	build_data = clean
-	return bp
 
 func instantiate_build(root: Node3D) -> Dictionary:
 	var out: Dictionary = build_data.duplicate(true)
