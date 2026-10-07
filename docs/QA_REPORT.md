@@ -143,3 +143,6 @@ Draw calls ≈ 175–250 and ≈ 170k–940k primitives depending on view (typic
 
 ## Manual checks done (via rendered screenshots)
 Menu/hangar, all aircraft in the carousel, midday and golden-hour lighting, flight HUD, sticks, pause menu, settings tabs, kill-cam UI, landing and gates modes, crash debris.
+
+## Self-audit of all 16 models (final pass)
+Every aircraft was rendered from four views and inspected. Fixed: the wheel spats on Aerostar, Skylark, Skipper and Vortex 540 are now long, slim streamlined shapes instead of round blobs. Still open: jagged livery edges (Skylark, Aerostar, Viper 90), the Skylark nose-gear strut rising in front of the cowl, and the wavy stripe on the Tundra Cub. Suite 257/257 twice and the flight bench reported no errors. Nothing was tested on a real device.

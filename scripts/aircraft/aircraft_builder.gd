@@ -1721,7 +1721,8 @@ func _build_wheel(wd: Dictionary, gi: int) -> void:
 			hk.add_cylinder(cc + Vector3(side_o * w * 0.46, 0, 0), cc + Vector3(side_o * w * 0.56, 0, 0), hr * 0.16, hr * 0.16, 6, MeshKit.const_color(_lin(Color(0.55, 0.55, 0.58))), true, true)
 	if bool(wd["pants"]):
 		var pk := _kit(slider, "body")
-		pk.add_ellipsoid(c + Vector3(0, r * 0.1, r * 0.35), Vector3(w * 0.78, r * 0.80, r * 1.9), 20, 10, _pfn("pant"))
+		# streamlined spat: long, slim ellipsoid pushed rearward so the nose sits just ahead of the tyre
+		pk.add_ellipsoid(c + Vector3(0, r * 0.12, r * 0.55), Vector3(w * 0.72, r * 0.74, r * 2.2), 24, 12, _pfn("pant"))
 	var retract_axis := Vector3(0, 0, 1) * (-signf(c.x) if absf(c.x) > 0.001 else 1.0)
 	var retract_angle := deg_to_rad(88.0)
 	if absf(c.x) < 0.001:
