@@ -19,7 +19,11 @@ static func instantiate(definition: Dictionary, cfg: Dictionary, detail := 2) ->
 	if not has_baked(id, detail):
 		return {}
 
-	var packed := ResourceLoader.load("%s/%s.scn" % [ROOT, id]) as PackedScene
+	var scene_path := "%s/%s.scn" % [ROOT, id]
+	var legacy_path := "res://assets/aircraft_legacy/%s.scn" % id
+	if bool(cfg.get("legacy_model", false)) and ResourceLoader.exists(legacy_path):
+		scene_path = legacy_path
+	var packed := ResourceLoader.load(scene_path) as PackedScene
 	var blueprint = ResourceLoader.load("%s/%s.res" % [ROOT, id])
 	if packed == null or blueprint == null or blueprint.format_version != 1:
 		return {}

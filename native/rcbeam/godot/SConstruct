@@ -45,6 +45,8 @@ env.Append(CPPPATH=[
 sources = Glob("src/*.cpp")
 sources.append("../src/solver.cpp")
 
+# Android builds from a Windows host must not inherit MinGW's empty prefix.
+env["SHLIBPREFIX"] = "" if env["platform"] == "windows" else "lib"
 suffix = env["suffix"].replace(".dev", "").replace(".universal", "")
 lib_filename = "{}{}{}{}".format(
     env.subst("$SHLIBPREFIX"),

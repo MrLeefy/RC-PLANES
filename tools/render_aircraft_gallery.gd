@@ -15,7 +15,7 @@ func _run() -> void:
 	bg.size = Vector2(1920, 1360)
 	root.add_child(bg)
 	var title := Label.new()
-	title.text = "RC PARK  |  Current baked aircraft — original procedural geometry"
+	title.text = "RC PARK  |  Premade aircraft fleet — RCBeam baseline"
 	title.position = Vector2(24, 12)
 	title.add_theme_font_size_override("font_size", 28)
 	root.add_child(title)

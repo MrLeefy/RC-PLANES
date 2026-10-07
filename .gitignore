@@ -16,3 +16,4 @@ native/rcbeam/godot/.sconsign*
 *.os
 addons/rcbeam/bin/
 addons/rcbeam/rcbeam.gdextension
+addons/rcbeam/rcbeam.gdextension.uid

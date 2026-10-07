@@ -13,6 +13,20 @@ func check(ok: bool, label: String) -> void:
 	print(("PASS " if ok else "FAIL ") + label)
 
 func _run() -> void:
+	if "--without-native" in OS.get_cmdline_user_args():
+		check(not AircraftStructure.available(), "extension is absent for fallback test")
+		for definition in AircraftDB.all():
+			var plane := Aircraft.new()
+			plane.setup(definition, {"rcbeam": true}, 2)
+			add_child(plane)
+			plane.freeze = true
+			await get_tree().process_frame
+			check(plane.structure == null and plane.mass > 0, "%s falls back safely without native library" % definition["id"])
+			plane.queue_free()
+			await get_tree().process_frame
+		print("RCBEAM FALLBACK TEST checks=%d failures=%d" % [checks, failures])
+		get_tree().quit(0 if failures == 0 else 1)
+		return
 	check(AircraftStructure.available(), "Godot 4.7 loads RCBeamSolver")
 	if failures > 0:
 		get_tree().quit(1)

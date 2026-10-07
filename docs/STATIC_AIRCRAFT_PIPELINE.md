@@ -38,6 +38,10 @@ All 16 default-detail models now ship saved scene/blueprint pairs. Workshop batt
 
 These are the original stylized RC designs saved as premade resources, not exact real-aircraft replicas or newly authored high-detail models. The baseline geometry is fixed independently of the small RCBeam cage. Cage deformation updates render component transforms and aerodynamic panel positions/normals/area; attachment fracture removes lift and control authority on the parent.
 
+`assets/aircraft_baked/baseline.json` locks the 16 scene/blueprint file hashes. `python tools/lock_aircraft_baseline.py` checks them. Intentional offline revisions require visual/physics validation followed by `--write`; runtime never writes the baseline.
+
+Skyliner 74 and Cargomaster 130 have an offline nose/flight-deck revision authored in `assets/aircraft_art/transport_noses.json`. `tools/refine_transport_noses.gd` edits the immutable legacy scene inputs, recalculates normals/LODs and saves the revised premade scenes. Their physics `.res` files are unchanged. Set `cfg.legacy_model=true` to load the preserved original scenes from `assets/aircraft_legacy/`. When rebuilding everything, run the legacy baker, then the nose-refinement tool, then validate and explicitly lock the accepted baseline.
+
 ## Measured proof of concept
 
 On the Oracle Linux build host using Godot 4.7.2, default-detail Skylark:
