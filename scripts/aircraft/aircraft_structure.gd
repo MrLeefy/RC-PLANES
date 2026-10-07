@@ -155,6 +155,13 @@ func _update_deformation() -> void:
 		var transform := Transform3D(deformation, p0 - deformation * cage["rest"][0])
 		cage["transform"] = transform
 
+func is_released(ci: int) -> bool:
+	while ci > 0:
+		if cages[ci] != null and solver.is_beam_broken(cages[ci]["attachment"]):
+			return true
+		ci = int(aircraft.comps[ci]["parent"])
+	return false
+
 func _update_aero() -> void:
 	for i in aircraft.panels.size():
 		var ci := panel_cages[i]
@@ -172,8 +179,7 @@ func _update_aero() -> void:
 		var span := deformation * (rest["span"] as Vector3)
 		var chord := deformation * (rest["fwd"] as Vector3)
 		panel["area"] = float(rest["area"]) * clampf(span.cross(chord).length(), 0.1, 1.5)
-		var attachment: int = cage["attachment"]
-		var released: bool = solver.is_beam_broken(attachment)
+		var released := is_released(ci)
 		panel["structure_eff"] = 0.0 if released else 1.0
 		# No lift or control authority remains on the parent after an attachment
 		# fails, including when the debris budget keeps it from becoming a body.
@@ -181,6 +187,9 @@ func _update_aero() -> void:
 			panel["alive"] = false
 			for control in panel["ctrls"]:
 				aircraft.surfaces[int(control["surf"])]["dead"] = true
+	for ei in aircraft.eng_defs.size():
+		if is_released(int(aircraft.eng_defs[ei]["comp"])):
+			aircraft.engines[ei].mount_ok = false
 
 func reset_aero() -> void:
 	for i in mini(panel_rest.size(), aircraft.panels.size()):

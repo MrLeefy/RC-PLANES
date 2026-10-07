@@ -106,6 +106,12 @@ func _run() -> void:
 	aircraft.update_visuals(Transform3D.IDENTITY, 0.0)
 	var visual: Node3D = aircraft.comps[wing]["visual"]
 	check(not visual.global_transform.is_equal_approx(Transform3D.IDENTITY), "cage deforms existing baked visual")
+	var bent_transform: Transform3D = proof.cages[wing]["transform"]
+	aircraft.detach(wing)
+	aircraft.update_visuals(Transform3D.IDENTITY, 0.0)
+	var debris: RigidBody3D = aircraft.debris_bodies[wing]
+	var expected := debris.global_transform * Transform3D(Basis(), -aircraft.comps[wing]["center"]) * bent_transform
+	check(visual.global_transform.is_equal_approx(expected), "detached wing retains its bent shape")
 	# Fresh graph for each destructive case, preserving isolation.
 	for ci in [wing, nose, gear, tail]:
 		aircraft.repair_all()
@@ -122,7 +128,22 @@ func _run() -> void:
 				if proof.panel_cages[pi] == ci:
 					lost_lift = lost_lift or not aircraft.panels[pi]["alive"]
 			check(lost_lift, "broken wing attachment removes parent lift")
+			var descendants_released := true
+			for pi in aircraft.panels.size():
+				if int(aircraft.panels[pi]["comp"]) in aircraft._descendants(wing):
+					descendants_released = descendants_released and not aircraft.panels[pi]["alive"]
+			check(descendants_released, "released wing descendants lose lift before debris activation")
 		aircraft.detach_queue.clear()
+	aircraft.repair_all()
+	proof = aircraft.structure
+	var engine_ci: int = aircraft.eng_defs[0]["comp"]
+	while engine_ci > 0 and proof.cages[engine_ci] == null:
+		engine_ci = int(aircraft.comps[engine_ci]["parent"])
+	proof.contact(proof.cages[engine_ci]["rest"][0], Vector3(0, 10, 0), Transform3D.IDENTITY)
+	for i in 60:
+		proof.step(1.0 / 120.0)
+	check(proof.is_released(engine_ci) and not aircraft.engines[0].mount_ok, "released firewall disables thrust before debris activation")
+	aircraft.detach_queue.clear()
 	aircraft.repair_all()
 	check(aircraft.structure.solver.get_break_event_count() == 0, "repair rebuilds pristine structure")
 	aircraft.structure = null
@@ -155,6 +176,36 @@ func _run() -> void:
 	check(fallback.structure == null, "legacy fallback has no structural work by default")
 	check(not fallback.enable_structure_proof() or AircraftStructure.available(), "dynamic native class avoids mandatory extension dependency")
 	fallback.free()
+	var configured := Aircraft.new()
+	configured.setup(AircraftDB.by_id("valor"), {"cg": -0.06}, 2)
+	add_child(configured)
+	configured.freeze = true
+	await get_tree().process_frame # Deferred debris root must enter the tree.
+	var shifted_gear := -1
+	for ci in configured.comps.size():
+		if configured.comps[ci].has("config_transform"):
+			shifted_gear = ci
+			break
+	check(shifted_gear >= 0, "Workshop CG configuration translates premade gear")
+	if shifted_gear >= 0:
+		var replay := Replay.new()
+		replay.bind(configured, null, [])
+		replay.record(0.0)
+		configured.apply_replay(replay.frames[0], replay.frames[0], 0.0, 0.0)
+		var gear_visual: Node3D = configured.comps[shifted_gear]["visual"]
+		var gear_offset: Transform3D = configured.comps[shifted_gear]["config_transform"]
+		check(gear_visual.transform.is_equal_approx(gear_offset), "attached replay preserves configured gear position")
+		configured.detach(shifted_gear)
+		configured.update_visuals(Transform3D.IDENTITY, 0.0)
+		var gear_body: RigidBody3D = configured.debris_bodies[shifted_gear]
+		var gear_expected := gear_body.global_transform * Transform3D(Basis(), -configured.comps[shifted_gear]["center"]) * gear_offset
+		check(gear_visual.global_transform.is_equal_approx(gear_expected), "detached gear preserves Workshop position")
+		replay.record(1.0)
+		configured.apply_replay(replay.frames[1], replay.frames[1], 0.0, 0.0)
+		check(gear_visual.global_transform.is_equal_approx(gear_expected), "detached replay preserves configured gear position")
+		replay.free()
+	configured.free()
+	await get_tree().process_frame
 	var fleet_ok := true
 	var max_nodes := 0
 	var max_beams := 0

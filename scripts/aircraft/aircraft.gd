@@ -1479,6 +1479,11 @@ func detach(ci: int, info := {}) -> void:
 	var xf := global_transform
 	var gm := 0.0
 	for g in group:
+		if structure != null:
+			var cage_ci: int = g
+			while cage_ci > 0 and structure.cages[cage_ci] == null:
+				cage_ci = int(comps[cage_ci]["parent"])
+			comps[g]["structural_transform"] = structure.cages[maxi(cage_ci, 0)]["transform"]
 		comps[g]["detached"] = true
 		comps[g]["debris"] = ci
 		gm += float(comps[g]["mass"])
@@ -1616,6 +1621,7 @@ func repair_all() -> void:
 
 func _reattach(ci: int) -> void:
 	var c: Dictionary = comps[ci]
+	c.erase("structural_transform")
 	c["detached"] = false
 	var owner_ci := int(c["debris"])
 	c["debris"] = -1
@@ -1723,6 +1729,8 @@ func restore(s: Dictionary) -> void:
 	if structure != null:
 		structure.reset_aero()
 	structure = null
+	for c in comps:
+		c.erase("structural_transform")
 	# re-attach anything that broke after the snapshot
 	for ci in comps.size():
 		var was_det := int(s["det"][ci]) == 1
@@ -1849,7 +1857,7 @@ func update_visuals(xf: Transform3D, delta: float) -> void:
 			var rb: RigidBody3D = debris_bodies[owner_ci] if owner_ci >= 0 and owner_ci < debris_bodies.size() else null
 			if rb and is_instance_valid(rb):
 				var center: Vector3 = comps[owner_ci]["center"]
-				vis.global_transform = rb.global_transform * Transform3D(Basis(), -center)
+				vis.global_transform = rb.global_transform * Transform3D(Basis(), -center) * c.get("structural_transform", Transform3D.IDENTITY) * c.get("config_transform", Transform3D.IDENTITY)
 			else:
 				vis.visible = false
 		else:
@@ -2124,13 +2132,13 @@ func apply_replay(fa: Dictionary, fb: Dictionary, a: float, delta: float) -> voi
 		var vis: Node3D = comps[ci]["visual"]
 		var ow := owners[ci]
 		if ow < 0:
-			vis.transform = Transform3D()
+			vis.transform = comps[ci].get("config_transform", Transform3D.IDENTITY)
 			vis.visible = true
 		elif dxa.has(ow):
 			var d1: Transform3D = dxa[ow]
 			var d2: Transform3D = dxb.get(ow, d1)
 			var center: Vector3 = comps[ow]["center"]
-			vis.global_transform = d1.interpolate_with(d2, a) * Transform3D(Basis(), -center)
+			vis.global_transform = d1.interpolate_with(d2, a) * Transform3D(Basis(), -center) * comps[ci].get("config_transform", Transform3D.IDENTITY)
 			vis.visible = true
 		else:
 			vis.visible = false

@@ -17,7 +17,7 @@ The previous Linux command forced x86_64. The `-m64` rejection is consistent wit
 | Native smoke, optimized build with assertions enabled | PASS |
 | Native regression: force duration at 4/8 substeps, impulse conservation, hard substep cap, plasticity, fracture | PASS |
 | Native hot path: 140 beams, 70 break groups, 120 steps plus indexed event clearing | PASS; zero calls to operator new after initialization |
-| Godot structural/aero/contact tests | PASS, 34/34 |
+| Godot structural/aero/contact and configured-gear replay tests | PASS, 41/41 |
 | Legacy crash/save/replay suite | PASS, 28/28 |
 | Flight envelope diagnostic scene | Completed for all 16, `DONE`; diagnostic rather than pass/fail assertions |
 | Workshop matrix before gear-data fix | FAIL, 3/104; Valor 4.459 g, Tiger 6.036 g, Brute 2.869 g mass mismatch at -6% MAC |
@@ -31,7 +31,7 @@ The previous Linux command forced x86_64. The `-m64` rejection is consistent wit
 
 Local logs are under ignored `build/`: `extension-build.log`, `android-build.log`, `baked-matrix.log` (initial failure), `baked-matrix-fixed.log`, `rcbeam-aero-test.log`, `legacy-suite.log`, `flight-suite.log`. CI logs are linked from PR #2. Full logs are not standing project instructions.
 
-Additional setup failures were corrected during validation: the first test launcher used `--script`, which cannot compile Aircraft's autoload references in that context; it was replaced with a regular test scene. An initial contact assertion expected impact substeps for a below-threshold impulse (1/27 checks failed); it now correctly checks normal substeps for a small contact and separately tests the eight-substep impact cap. The final suite has 34 passing checks. The first gallery attempt displayed all live meshes simultaneously and exceeded the OpenGL instance-variable buffer; the renderer now captures one model at a time and assembles the gallery from actual render textures.
+Additional setup failures were corrected during validation: the first test launcher used `--script`, which cannot compile Aircraft's autoload references in that context; it was replaced with a regular test scene. An initial contact assertion expected impact substeps for a below-threshold impulse (1/27 checks failed); it now correctly checks normal substeps for a small contact and separately tests the eight-substep impact cap. The final suite has 41 passing checks. A first gear replay test accessed its deferred debris root before it entered the scene tree, producing engine errors despite passing assertions; awaiting the tree attachment corrected the test. Final `rcbeam-retained-shape.log` and `legacy-retained-shape.log` contain no ERROR or FAIL entries (41/41 and 28/28). The first gallery attempt displayed all live meshes simultaneously and exceeded the OpenGL instance-variable buffer; the renderer now captures one model at a time and assembles the gallery from actual render textures.
 
 Gallery reproduction: `godot --path . --rendering-method gl_compatibility --resolution 1920x1360 --script res://tools/render_aircraft_gallery.gd`. The output contains real engine screenshots, not AI-generated model previews. The transport refinement uses Godot's [ArrayMesh](https://docs.godotengine.org/en/4.7/classes/class_arraymesh.html) and offline ImporterMesh LOD generation.
 
@@ -45,6 +45,7 @@ Committed screenshots: [fleet](images/rcbeam-fleet.png), [revised Skyliner](imag
 - Tests verify ten seconds without drift, intact flight-force equivalence, changed force/torque after asymmetric bending, wing lift loss after release, four distinct destructive attachment cases, repair, a real Jolt drop and a six-body debris limit.
 - Bounds: 4 normal / 8 impact substeps; oversized (>1/30 s), nonpositive and nonfinite frame durations are rejected. Native event buffers retain capacity.
 - Premade visuals receive an affine transform per tetrahedral component cage. Aerodynamic panel positions, forward vectors, inverse-transpose normals and areas follow it. Released panels and controls stop contributing to the parent, including when debris capacity is exhausted.
+- Release propagates through component ancestry, so attached wingtip panels lose lift with the wing and engine mounts lose thrust with the firewall even before debris activation. Detached visuals retain their last deformation; configured gear offsets survive live detachment and legacy replay. Repair/rewind clear retained deformation.
 
 ## Limits before production enablement
 
