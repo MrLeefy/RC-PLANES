@@ -4,6 +4,7 @@ extends RefCounted
 ## mesh construction in AircraftBuilder.
 
 const ROOT := "res://assets/aircraft_baked"
+const BakedBlueprint = preload("res://scripts/aircraft/aircraft_baked_blueprint.gd")
 
 static func _default_cfg(cfg: Dictionary) -> bool:
 	return (
@@ -31,7 +32,7 @@ static func instantiate(definition: Dictionary, cfg: Dictionary, detail := 2) ->
 		return {}
 
 	var packed := ResourceLoader.load("%s/%s.scn" % [ROOT, id]) as PackedScene
-	var blueprint := ResourceLoader.load("%s/%s.res" % [ROOT, id]) as AircraftBakedBlueprint
+	var blueprint = ResourceLoader.load("%s/%s.res" % [ROOT, id])
 	if packed == null or blueprint == null or blueprint.format_version != 1:
 		return {}
 	if blueprint.source_aircraft_id != id or blueprint.source_detail != detail:
