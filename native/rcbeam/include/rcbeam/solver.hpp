@@ -100,6 +100,8 @@ struct StepStats {
 
 class Solver {
 public:
+    static constexpr std::uint32_t INVALID_INDEX = 0xFFFFFFFFu;
+
     explicit Solver(SolverConfig config = {});
 
     void reserve(std::size_t node_capacity, std::size_t beam_capacity);
