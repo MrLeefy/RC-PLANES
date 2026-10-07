@@ -11,6 +11,7 @@ if not os.path.isdir(godot_cpp_dir):
     Exit(1)
 
 local_env = Environment(tools=["default"], PLATFORM="")
+local_env["build_profile"] = os.path.join(os.getcwd(), "build_profile.json")
 opts = Variables()
 opts.Update(local_env)
 env = local_env.Clone()
