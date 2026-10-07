@@ -157,7 +157,7 @@ void Solver::reserve(std::size_t node_capacity, std::size_t beam_capacity) {
 
 std::uint32_t Solver::add_node(Vec3 position, float mass_kg, bool pinned) {
     if (!pinned && mass_kg <= 0.0f) {
-        throw std::invalid_argument("RCBeam node mass must be > 0");
+        return INVALID_INDEX;
     }
 
     Node node{};
@@ -177,12 +177,12 @@ std::uint32_t Solver::add_beam(
     std::uint16_t break_group
 ) {
     if (a >= nodes_.size() || b >= nodes_.size() || a == b) {
-        throw std::invalid_argument("RCBeam beam endpoints are invalid");
+        return INVALID_INDEX;
     }
 
     const float initial = length(nodes_[b].position - nodes_[a].position);
     if (initial <= kEpsilon) {
-        throw std::invalid_argument("RCBeam beam length must be > 0");
+        return INVALID_INDEX;
     }
 
     Beam beam{};
