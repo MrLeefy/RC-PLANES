@@ -1851,7 +1851,7 @@ func _assign_masses() -> void:
 		need = clampf(need, 0.0, float(d["mass"]) * 0.18)
 		if need > 0.0:
 			ballast = need
-			(core["point_masses"] as Array).append({"pos": Vector3(0, float(_fus_param(bz)[2]), bz), "m": need, "size": Vector3(0.02, 0.02, 0.02)})
+			(core["point_masses"] as Array).append({"pos": Vector3(0, float(_fus_param(bz)[2]), bz), "m": need, "size": Vector3(0.02, 0.02, 0.02), "ballast": true})
 			core["mass"] = float(core["mass"]) + need
 			m0 += need
 			mz += need * bz
