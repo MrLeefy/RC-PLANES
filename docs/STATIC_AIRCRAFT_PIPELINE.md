@@ -54,6 +54,8 @@ On the Oracle Linux build host using Godot 4.7.2, default-detail Skylark:
 
 These numbers are build-host measurements, not an Android device claim. Android profiling remains required.
 
+After the Workshop gear-data fix and transport artwork revision, a local Windows Godot 4.7.2 headless benchmark across all 16 models measured **14,792.477 ms** total procedural construction versus **116.247 ms** total saved-scene/blueprint instantiation (**127.3x**). This measures the loader/build comparison, not complete Aircraft setup or Android frame time. All component/panel/control/engine/wheel counts matched.
+
 ## Realistic replacement model requirements
 
 A replacement aircraft should arrive as an authored high-detail master, not generated runtime geometry.

@@ -1,10 +1,11 @@
 name: RCBeam validation
 on:
-  push:
-    branches: [codex/structural-crash-realism]
   pull_request:
-    paths: ['native/rcbeam/**', 'scripts/aircraft/**', 'tests/**', 'tools/**', '.github/workflows/rcbeam.yml']
+    paths: ['native/rcbeam/**', 'scripts/aircraft/**', 'scripts/game/flight.gd', 'tests/**', 'tools/**', 'assets/aircraft_baked/**', 'assets/aircraft_art/**', 'assets/aircraft_legacy/**', '.github/workflows/rcbeam.yml']
   workflow_dispatch:
+concurrency:
+  group: rcbeam-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 jobs:
   linux:
     strategy:

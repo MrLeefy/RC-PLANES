@@ -25,6 +25,7 @@ The previous Linux command forced x86_64. The `-m64` rejection is consistent wit
 | Linux x86_64 / ARM64 native builds and Godot tests | PASS on both: 2/2 native tests, 34/34 Godot tests; [CI run](https://github.com/MrLeefy/RC-PLANES/actions/runs/37621163985) |
 | Static fleet geometry, normals, triangle indices, blueprint node paths and transport legacy-art fallback | PASS, 16/16 |
 | Accepted premade baseline manifest | PASS, 16 scene/blueprint hash pairs |
+| Final Windows headless fleet loader benchmark | PASS, 16/16 structural counts match; 14,792.477 ms procedural / 116.247 ms premade (127.3x) |
 | No-extension fallback | PASS, 17/17: absent class plus all 16 opt-in aircraft safely retaining the legacy path |
 | Transport nose revision | PASS: 14,863 vertices processed offline; visual review corrected initial windshield/hull intersections; physics blueprint files unchanged |
 
@@ -33,6 +34,8 @@ Local logs are under ignored `build/`: `extension-build.log`, `android-build.log
 Additional setup failures were corrected during validation: the first test launcher used `--script`, which cannot compile Aircraft's autoload references in that context; it was replaced with a regular test scene. An initial contact assertion expected impact substeps for a below-threshold impulse (1/27 checks failed); it now correctly checks normal substeps for a small contact and separately tests the eight-substep impact cap. The final suite has 34 passing checks. The first gallery attempt displayed all live meshes simultaneously and exceeded the OpenGL instance-variable buffer; the renderer now captures one model at a time and assembles the gallery from actual render textures.
 
 Gallery reproduction: `godot --path . --rendering-method gl_compatibility --resolution 1920x1360 --script res://tools/render_aircraft_gallery.gd`. The output contains real engine screenshots, not AI-generated model previews. The transport refinement uses Godot's [ArrayMesh](https://docs.godotengine.org/en/4.7/classes/class_arraymesh.html) and offline ImporterMesh LOD generation.
+
+Committed screenshots: [fleet](images/rcbeam-fleet.png), [revised Skyliner](images/skyliner-revised.png), [revised Cargomaster](images/cargomaster-revised.png). Local final logs: `baked-matrix-final.log`, `legacy-suite-final.log`, `rcbeam-final.log`, `static-fleet.log`, `fallback-test.log`, `baked-benchmark-final.log`, `android-release-final.log`, `android-debug-final.log`.
 
 ## What is integrated
 
