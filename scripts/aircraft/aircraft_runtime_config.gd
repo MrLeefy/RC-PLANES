@@ -42,6 +42,16 @@ static func apply(build: Dictionary, definition: Dictionary, cfg: Dictionary) ->
 				engine["D"] = float(prop["d"])
 				engine["pitch"] = float(prop["pitch"])
 				engine["blades"] = int(prop["blades"])
+				var pci := int(engine.get("prop_comp", -1))
+				if pci >= 0 and pci < comps.size():
+					var pc: Dictionary = comps[pci]
+					var dia := float(prop["d"])
+					pc["size"] = Vector3(dia, dia, maxf(float((pc["size"] as Vector3).z), 0.02))
+					for pm in pc["point_masses"]:
+						pm["size"] = Vector3(dia, dia, maxf(float((pm["size"] as Vector3).z), 0.02))
+					for shape in pc.get("shapes", []):
+						if String(shape.get("type", "")) == "cyl":
+							shape["r"] = dia * 0.48
 
 	var m0 := 0.0
 	var mz := 0.0
