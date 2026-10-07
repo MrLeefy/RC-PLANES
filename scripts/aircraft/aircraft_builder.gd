@@ -1570,12 +1570,17 @@ func _tire(kit: MeshKit, c: Vector3, r: float, w: float, col: Callable, bush := 
 	var R := r - rt
 	var prof := []
 	var n := 10 if lod_detail >= 1 else 6
+	# solid sidewalls: the profile starts and ends at the rim radius so the tyre has no see-through gap to the hub
+	prof.append(Vector2(rt * 0.92, R * 0.42))
+	prof.append(Vector2(rt * 0.92, R))
 	for i in n + 1:
 		# clockwise in (axial, radius) plane: start inner-left, over the top, to inner-right
 		var a := PI - PI * float(i) / n   # PI -> 0
 		var ax := cos(a) * rt * (0.9 if not bush else 1.0)
 		var rr := R + sin(a) * rt * (1.0 if not bush else 1.15)
 		prof.append(Vector2(-ax, rr))
+	prof.append(Vector2(-rt * 0.92, R))
+	prof.append(Vector2(-rt * 0.92, R * 0.42))
 	# lathe about the x axis
 	var bas := Basis(Vector3(0, 1, 0), Vector3(0, 0, 1), Vector3(1, 0, 0))
 	kit.add_lathe(prof, c, bas, 20 if lod_detail >= 1 else 10, col)
