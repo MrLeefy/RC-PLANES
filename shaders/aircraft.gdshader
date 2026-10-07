@@ -97,9 +97,9 @@ void fragment() {
 	} else if (kind == 5) {
 		vec2 w = UV * 420.0;
 		float wv = sin(w.x) * sin(w.y) * (1.0 - smoothstep(0.4, 1.6, max(fwidth(w.x), fwidth(w.y))));
-		base *= 0.95 + wv * 0.05;
+		base *= 0.98 + wv * 0.02;
 		r = rough + wv * 0.05;
-		g += vec3(sin(w.x), 0.0, sin(w.y)) * 0.12 * micro * hi;
+		g += vec3(sin(w.x), 0.0, sin(w.y)) * 0.05 * micro * hi * (1.0 - smoothstep(0.003, 0.02, pixel));
 	} else if (kind == 6) {
 		float b = mix(0.5, n3(opos * 90.0), micro);
 		base *= 0.9 + b * 0.15;
@@ -108,7 +108,7 @@ void fragment() {
 	}
 	// paint finish: fine orange peel, airflow-aligned grime streaks and soot, underside soiling, edge sheen
 	if (kind == 1 || kind == 2 || kind == 7 || kind == 8) {
-		g += vec3(n3(opos * 260.0) - 0.5, 0.0, n3(opos * 260.0 + 9.0) - 0.5) * 0.10 * micro * hi;
+		g += vec3(n3(opos * 260.0) - 0.5, 0.0, n3(opos * 260.0 + 9.0) - 0.5) * 0.05 * micro * hi * (1.0 - smoothstep(0.003, 0.02, pixel));
 	}
 	if (hi > 0.5 && kind != 3 && kind != 9 && kind != 6) {
 		float lo = n3(vec3(opos.x * 6.0, opos.y * 6.0, opos.z * 1.1));                // broad fading
