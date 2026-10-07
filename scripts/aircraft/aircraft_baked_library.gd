@@ -5,16 +5,7 @@ extends RefCounted
 
 const ROOT := "res://assets/aircraft_baked"
 const BakedBlueprint = preload("res://scripts/aircraft/aircraft_baked_blueprint.gd")
-
-static func _default_cfg(cfg: Dictionary) -> bool:
-	return (
-		int(cfg.get("battery", 0)) == 0
-		and int(cfg.get("prop", 0)) == 0
-		and int(cfg.get("engine", 0)) == 0
-		and absf(float(cfg.get("cg", 0.0))) < 0.00001
-		and String(cfg.get("throws", "high")) == "high"
-		and absf(float(cfg.get("fuel", 1.0)) - 1.0) < 0.00001
-	)
+const RuntimeConfig = preload("res://scripts/aircraft/aircraft_runtime_config.gd")
 
 static func has_baked(id: String, detail := 2) -> bool:
 	if detail != 2:
@@ -22,10 +13,7 @@ static func has_baked(id: String, detail := 2) -> bool:
 	return ResourceLoader.exists("%s/%s.scn" % [ROOT, id]) and ResourceLoader.exists("%s/%s.res" % [ROOT, id])
 
 static func instantiate(definition: Dictionary, cfg: Dictionary, detail := 2) -> Dictionary:
-	# First implementation is exact for the shipped/default workshop setup.
-	# Non-default mass/prop/CG variants deliberately stay on the legacy path until
-	# the lightweight runtime configuration delta layer is complete.
-	if detail != 2 or not _default_cfg(cfg):
+	if detail != 2:
 		return {}
 	var id := String(definition["id"])
 	if not has_baked(id, detail):
@@ -42,6 +30,7 @@ static func instantiate(definition: Dictionary, cfg: Dictionary, detail := 2) ->
 	if root == null:
 		return {}
 	var build: Dictionary = blueprint.call("instantiate_build", root)
+	RuntimeConfig.apply(build, definition, cfg)
 	return {
 		"build": build,
 		"body_drag": blueprint.body_drag.duplicate(true),
@@ -49,4 +38,4 @@ static func instantiate(definition: Dictionary, cfg: Dictionary, detail := 2) ->
 	}
 
 static func mode_for(definition: Dictionary, cfg: Dictionary, detail := 2) -> String:
-	return "baked" if detail == 2 and _default_cfg(cfg) and has_baked(String(definition["id"]), detail) else "procedural_fallback"
+	return "baked" if detail == 2 and has_baked(String(definition["id"]), detail) else "procedural_fallback"
