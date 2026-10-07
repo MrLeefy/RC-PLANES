@@ -10,6 +10,7 @@ extends SceneTree
 ## Shipping builds load these directly and skip procedural mesh construction.
 
 const OUT_DIR := "res://assets/aircraft_baked"
+const BakedBlueprint = preload("res://scripts/aircraft/aircraft_baked_blueprint.gd")
 
 func _initialize() -> void:
 	call_deferred("_run")
@@ -51,7 +52,7 @@ func _run() -> void:
 		root.name = "Visual"
 		_set_scene_owners(root, root)
 
-		var bp := AircraftBakedBlueprint.capture(build, builder.body_drag, root, id, 2)
+		var bp = BakedBlueprint.capture(build, builder.body_drag, root, id, 2)
 		var bp_err := ResourceSaver.save(bp, "%s/%s.res" % [OUT_DIR, id], ResourceSaver.FLAG_COMPRESS)
 		if bp_err != OK:
 			push_error("Blueprint save failed for %s: %s" % [id, error_string(bp_err)])
