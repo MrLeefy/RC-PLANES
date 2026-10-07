@@ -54,17 +54,22 @@ void RCBeamSolver::clear() {
 }
 
 int RCBeamSolver::add_node(Vector3 position, double mass_kg, bool pinned) {
-    return static_cast<int>(solver_.add_node(to_native(position), static_cast<float>(mass_kg), pinned));
+    const std::uint32_t index = solver_.add_node(to_native(position), static_cast<float>(mass_kg), pinned);
+    return index == rcbeam::Solver::INVALID_INDEX ? -1 : static_cast<int>(index);
 }
 
 int RCBeamSolver::add_beam_preset(int a, int b, int material_preset, int break_group) {
     const rcbeam::Material material = rcbeam::material_preset(to_material_kind(material_preset));
-    return static_cast<int>(solver_.add_beam(
+    if (a < 0 || b < 0) {
+        return -1;
+    }
+    const std::uint32_t index = solver_.add_beam(
         static_cast<std::uint32_t>(a),
         static_cast<std::uint32_t>(b),
         material,
         static_cast<std::uint16_t>(std::clamp(break_group, 0, 65535))
-    ));
+    );
+    return index == rcbeam::Solver::INVALID_INDEX ? -1 : static_cast<int>(index);
 }
 
 int RCBeamSolver::add_beam_custom(
@@ -90,12 +95,16 @@ int RCBeamSolver::add_beam_custom(
     material.plasticity_rate = static_cast<float>(std::max(plasticity_rate, 0.0));
     material.max_plastic_strain = static_cast<float>(std::max(max_plastic_strain, 0.0));
 
-    return static_cast<int>(solver_.add_beam(
+    if (a < 0 || b < 0) {
+        return -1;
+    }
+    const std::uint32_t index = solver_.add_beam(
         static_cast<std::uint32_t>(a),
         static_cast<std::uint32_t>(b),
         material,
         static_cast<std::uint16_t>(std::clamp(break_group, 0, 65535))
-    ));
+    );
+    return index == rcbeam::Solver::INVALID_INDEX ? -1 : static_cast<int>(index);
 }
 
 void RCBeamSolver::apply_force(int node, Vector3 force_n) {
