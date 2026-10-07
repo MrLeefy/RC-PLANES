@@ -13,6 +13,7 @@ signal message(text: String)
 
 const RHO := 1.225
 const G := 9.81
+const BakedAircraftLibrary = preload("res://scripts/aircraft/aircraft_baked_library.gd")
 
 var def: Dictionary
 var cfg: Dictionary
@@ -117,7 +118,7 @@ func setup(definition: Dictionary, config: Dictionary, detail_level := 2, for_di
 	detail = detail_level
 	display_only = for_display
 	name = String(def["id"])
-	var baked := AircraftBakedLibrary.instantiate(def, cfg, detail)
+	var baked := BakedAircraftLibrary.instantiate(def, cfg, detail)
 	if not baked.is_empty():
 		build = baked["build"]
 		body_drag = baked["body_drag"]
