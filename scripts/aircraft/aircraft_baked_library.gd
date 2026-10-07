@@ -41,7 +41,7 @@ static func instantiate(definition: Dictionary, cfg: Dictionary, detail := 2) ->
 	var root := packed.instantiate() as Node3D
 	if root == null:
 		return {}
-	var build := blueprint.instantiate_build(root)
+	var build: Dictionary = blueprint.call("instantiate_build", root)
 	return {
 		"build": build,
 		"body_drag": blueprint.body_drag.duplicate(true),
