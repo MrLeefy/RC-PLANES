@@ -117,14 +117,19 @@ func setup(definition: Dictionary, config: Dictionary, detail_level := 2, for_di
 	detail = detail_level
 	display_only = for_display
 	name = String(def["id"])
-	var b := AircraftBuilder.new()
-	build = b.build(def, cfg, detail)
+	var baked := AircraftBakedLibrary.instantiate(def, cfg, detail)
+	if not baked.is_empty():
+		build = baked["build"]
+		body_drag = baked["body_drag"]
+	else:
+		var b := AircraftBuilder.new()
+		build = b.build(def, cfg, detail)
+		body_drag = b.body_drag
 	comps = build["comps"]
 	panels = build["panels"]
 	surfaces = build["surfaces"]
 	eng_defs = build["engines"]
 	wheels = build["wheels"]
-	body_drag = b.body_drag
 	span = float(build["span"])
 	length_m = float(build["length"])
 	mac_c = float(build["mac"]["c"])
