@@ -12,7 +12,7 @@ extends Resource
 @export var source_detail := 2
 @export var format_version := 1
 
-static func capture(source_build: Dictionary, drag: Dictionary, root: Node3D, aircraft_id: String, detail: int) -> AircraftBakedBlueprint:
+static func capture(source_build: Dictionary, drag: Dictionary, root: Node3D, aircraft_id: String, detail: int):
 	var bp := AircraftBakedBlueprint.new()
 	bp.source_aircraft_id = aircraft_id
 	bp.source_detail = detail
