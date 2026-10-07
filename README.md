@@ -1,8 +1,10 @@
 # RC PARK — Android RC airplane simulator (Godot 4.7)
 
 Native Godot 4.7.2 project (Mobile renderer, Jolt physics @ 120 Hz, landscape, touch-first).
-Everything — aircraft, terrain, trees, field props, textures, sounds — is generated procedurally
-at load time from code in this repository. No third-party models, textures or audio are shipped.
+All 16 aircraft load premade scene/physics resources at default detail; Workshop settings update
+data without rebuilding meshes. Terrain, trees, field props, textures and sounds are generated
+from repository code. The original aircraft builder remains an offline tool and safe fallback.
+No third-party models, textures or audio are shipped.
 
 ## Quick start
 - Install: `adb install -r RCPark-debug.apk` (arm64-v8a, Android 7.0+ / API 24+).
@@ -24,3 +26,8 @@ at load time from code in this repository. No third-party models, textures or au
 - `godot --headless --fixed-fps 120 --path . res://tests/flight_test.tscn` → per-aircraft flight envelope checks.
 
 See `docs/` for architecture, aircraft data, assets/licensing, QA report and the list of unverified items.
+
+The optional RCBeam structural proof is enabled with `godot --path . -- --rcbeam-proof`
+after building/installing the host GDExtension. Bending changes aerodynamic panels; attachment
+fracture removes parent lift/control authority. See `docs/RCBEAM_VALIDATION.md` for results and
+remaining mobile, calibration and replay work. The default path keeps the established physics.

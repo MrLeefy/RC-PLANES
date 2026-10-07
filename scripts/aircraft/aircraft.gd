@@ -13,6 +13,7 @@ signal message(text: String)
 
 const RHO := 1.225
 const G := 9.81
+const BakedAircraftLibrary = preload("res://scripts/aircraft/aircraft_baked_library.gd")
 
 var def: Dictionary
 var cfg: Dictionary
@@ -117,14 +118,19 @@ func setup(definition: Dictionary, config: Dictionary, detail_level := 2, for_di
 	detail = detail_level
 	display_only = for_display
 	name = String(def["id"])
-	var b := AircraftBuilder.new()
-	build = b.build(def, cfg, detail)
+	var baked := BakedAircraftLibrary.instantiate(def, cfg, detail)
+	if not baked.is_empty():
+		build = baked["build"]
+		body_drag = baked["body_drag"]
+	else:
+		var b := AircraftBuilder.new()
+		build = b.build(def, cfg, detail)
+		body_drag = b.body_drag
 	comps = build["comps"]
 	panels = build["panels"]
 	surfaces = build["surfaces"]
 	eng_defs = build["engines"]
 	wheels = build["wheels"]
-	body_drag = b.body_drag
 	span = float(build["span"])
 	length_m = float(build["length"])
 	mac_c = float(build["mac"]["c"])
@@ -216,6 +222,19 @@ func setup(definition: Dictionary, config: Dictionary, detail_level := 2, for_di
 	_ray_params.collision_mask = Game.L_WORLD | Game.L_NPC
 	_ray_params.exclude = [get_rid()]
 	_ray_params.hit_from_inside = false
+	if not display_only and bool(cfg.get("rcbeam", false)):
+		enable_structure_proof()
+
+var structure: AircraftStructure
+
+func enable_structure_proof() -> bool:
+	if structure != null:
+		structure.reset_aero()
+	var proof := AircraftStructure.new()
+	if not proof.setup(self):
+		return false
+	structure = proof
+	return true
 
 func _setup_power() -> void:
 	var t := String(def["engines"][0]["type"])
@@ -609,6 +628,8 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	_gear(state, dt, xf, com_w, v_w, w_w, space)
 	# ---- contacts -> damage ----
 	_contacts(state)
+	if structure != null:
+		structure.step(dt)
 	on_ground = wheels_touching > 0 or _body_ground_contact
 	if on_ground:
 		ground_time += dt
@@ -713,7 +734,7 @@ func _aero(v_l: Vector3, w_l: Vector3, wind_l: Vector3, wind_tip_l: Vector3, ge_
 		var dal_f := 0.0
 		var cdc := 0.0
 		var cmc := 0.0
-		var area_f := float(p["eff"])
+		var area_f := float(p["eff"]) * float(p.get("structure_eff", 1.0))
 		for c in p["ctrls"]:
 			var s: Dictionary = surfaces[int(c["surf"])]
 			if s["dead"]:
@@ -1252,6 +1273,8 @@ func _contacts(state: PhysicsDirectBodyState3D) -> void:
 		var closing := maxf(-v_rel.dot(n), 0.0)
 		var J := state.get_contact_impulse(i).length()
 		var pos := state.get_contact_collider_position(i)
+		if structure != null and contact_grace <= 0:
+			structure.contact(pos, state.get_contact_impulse(i), state.transform)
 		var collider := state.get_contact_collider_object(i)
 		var tang := contact_tangent(v_rel, n).length()
 		# A lateral obstacle impact is not support beneath the aircraft.
@@ -1445,6 +1468,8 @@ func _process_detach_queue() -> void:
 func detach(ci: int, info := {}) -> void:
 	if comps[ci]["detached"] or ci == 0:
 		return
+	if structure != null and structure._debris_count() >= AircraftStructure.MAX_ACTIVE_DEBRIS:
+		return
 	var group = [ci]
 	for dsc in _descendants(ci):
 		if not comps[dsc]["detached"]:
@@ -1454,6 +1479,11 @@ func detach(ci: int, info := {}) -> void:
 	var xf := global_transform
 	var gm := 0.0
 	for g in group:
+		if structure != null:
+			var cage_ci: int = g
+			while cage_ci > 0 and structure.cages[cage_ci] == null:
+				cage_ci = int(comps[cage_ci]["parent"])
+			comps[g]["structural_transform"] = structure.cages[maxi(cage_ci, 0)]["transform"]
 		comps[g]["detached"] = true
 		comps[g]["debris"] = ci
 		gm += float(comps[g]["mass"])
@@ -1549,6 +1579,8 @@ func _crash(info: Dictionary) -> void:
 
 # ================================================================ repair / reset
 func repair_all() -> void:
+	if structure != null:
+		enable_structure_proof()
 	for ci in comps.size():
 		var c: Dictionary = comps[ci]
 		c["hp"] = 1.0
@@ -1589,6 +1621,7 @@ func repair_all() -> void:
 
 func _reattach(ci: int) -> void:
 	var c: Dictionary = comps[ci]
+	c.erase("structural_transform")
 	c["detached"] = false
 	var owner_ci := int(c["debris"])
 	c["debris"] = -1
@@ -1691,6 +1724,13 @@ func snapshot() -> Dictionary:
 		"wind_t": Game.wind.t if Game.wind else 0.0}
 
 func restore(s: Dictionary) -> void:
+	# Structural rewind is not yet serialized: return to the legacy renderer and
+	# damage path instead of retaining future deformation in a restored snapshot.
+	if structure != null:
+		structure.reset_aero()
+	structure = null
+	for c in comps:
+		c.erase("structural_transform")
 	# re-attach anything that broke after the snapshot
 	for ci in comps.size():
 		var was_det := int(s["det"][ci]) == 1
@@ -1817,13 +1857,15 @@ func update_visuals(xf: Transform3D, delta: float) -> void:
 			var rb: RigidBody3D = debris_bodies[owner_ci] if owner_ci >= 0 and owner_ci < debris_bodies.size() else null
 			if rb and is_instance_valid(rb):
 				var center: Vector3 = comps[owner_ci]["center"]
-				vis.global_transform = rb.global_transform * Transform3D(Basis(), -center)
+				vis.global_transform = rb.global_transform * Transform3D(Basis(), -center) * c.get("structural_transform", Transform3D.IDENTITY) * c.get("config_transform", Transform3D.IDENTITY)
 			else:
 				vis.visible = false
 		else:
-			vis.transform = Transform3D()
+			vis.transform = c.get("config_transform", Transform3D.IDENTITY)
 			vis.visible = true
 	_animate(delta)
+	if structure != null:
+		structure.deform_visuals(xf)
 
 func _animate(delta: float) -> void:
 	for cut in build.get("fractures", []):
@@ -1937,6 +1979,8 @@ func health_summary() -> Array:
 
 # ================================================================ secondary breakup
 func split_debris(rb: RigidBody3D, sev: float) -> void:
+	if structure != null and structure._debris_count() >= AircraftStructure.MAX_ACTIVE_DEBRIS:
+		return
 	var members: Array = rb.get_meta("members", [])
 	var owner_ci := int(rb.get_meta("ci"))
 	var cands = []
@@ -2088,13 +2132,13 @@ func apply_replay(fa: Dictionary, fb: Dictionary, a: float, delta: float) -> voi
 		var vis: Node3D = comps[ci]["visual"]
 		var ow := owners[ci]
 		if ow < 0:
-			vis.transform = Transform3D()
+			vis.transform = comps[ci].get("config_transform", Transform3D.IDENTITY)
 			vis.visible = true
 		elif dxa.has(ow):
 			var d1: Transform3D = dxa[ow]
 			var d2: Transform3D = dxb.get(ow, d1)
 			var center: Vector3 = comps[ow]["center"]
-			vis.global_transform = d1.interpolate_with(d2, a) * Transform3D(Basis(), -center)
+			vis.global_transform = d1.interpolate_with(d2, a) * Transform3D(Basis(), -center) * comps[ci].get("config_transform", Transform3D.IDENTITY)
 			vis.visible = true
 		else:
 			vis.visible = false

@@ -1,0 +1,63 @@
+#!/usr/bin/env python
+import os
+import sys
+import subprocess
+
+libname = "rcbeam"
+godot_cpp_dir = ARGUMENTS.get("godot_cpp_dir", os.path.join(os.getcwd(), "godot-cpp"))
+
+if not os.path.isdir(godot_cpp_dir):
+    print("godot-cpp not found at: {}".format(godot_cpp_dir))
+    print("Clone godotengine/godot-cpp there, or pass godot_cpp_dir=/path/to/godot-cpp")
+    Exit(1)
+
+local_env = Environment(tools=["default"], PLATFORM="")
+local_env["build_profile"] = os.path.join(os.getcwd(), "build_profile.json")
+opts = Variables()
+opts.Update(local_env)
+env = local_env.Clone()
+
+# godot-cpp v10 can target Godot 4.7 explicitly.
+env = SConscript(
+    os.path.join(godot_cpp_dir, "SConstruct"),
+    {"api_version": "4.7", "env": env, "customs": []},
+)
+
+# Probe the actual compiler, not the machine running SCons (cross builds may
+# differ). Fail before compilation instead of hiding incompatible -m64 flags.
+if env["platform"] == "linux":
+    command = [str(arg) for arg in env.subst_list("$CXX $CXXFLAGS $CCFLAGS")[0]]
+    probe = subprocess.run(command + ["-dM", "-E", "-x", "c++", "-"],
+                           input="", text=True, capture_output=True, env=env["ENV"])
+    macros = probe.stdout
+    expected = {"x86_64": "__x86_64__", "x86_32": "__i386__", "arm64": "__aarch64__"}
+    if probe.returncode or (env["arch"] in expected and expected[env["arch"]] not in macros):
+        print("RCBeam: compiler cannot target Linux {}. Use the native arch (omit arch=),"
+              " or select a matching cross compiler with CXX/CC.".format(env["arch"]))
+        print(probe.stderr)
+        Exit(1)
+
+env.Append(CPPPATH=[
+    "src",
+    "../include",
+])
+
+sources = Glob("src/*.cpp")
+sources.append("../src/solver.cpp")
+
+# Android builds from a Windows host must not inherit MinGW's empty prefix.
+env["SHLIBPREFIX"] = "" if env["platform"] == "windows" else "lib"
+suffix = env["suffix"].replace(".dev", "").replace(".universal", "")
+lib_filename = "{}{}{}{}".format(
+    env.subst("$SHLIBPREFIX"),
+    libname,
+    suffix,
+    env.subst("$SHLIBSUFFIX"),
+)
+
+library = env.SharedLibrary(
+    "bin/{}/{}".format(env["platform"], lib_filename),
+    source=sources,
+)
+
+Default(library)
