@@ -1,5 +1,7 @@
 # RC Park 0.10.0 — implementation preview
 
+> **Status update (1.0.0-beta.1, 2026-10-08):** the release status, verified checks and open items are in `docs/PLAY_STORE.md` and `docs/QA_REPORT.md`. The sections below describe the 0.10.0 preview as it was delivered.
+
 ## Status and important limits
 This package contains actual edited Godot source, not a new APK and not a claim of completed QA. The original user-uploaded APKs have not been changed or relabelled as an upgraded build.
 
