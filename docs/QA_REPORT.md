@@ -1,6 +1,32 @@
 # QA / test report
 
-Date: 2026-09-26 · Build: 0.9.0 (versionCode 9) · Godot 4.7.2 stable · Jolt · 120 Hz physics
+Latest pass: 1.0.0-beta.1 (2026-10-08) — see the first section. Earlier pass: 0.9.0 (2026-09-26) · Godot 4.7.2 stable · Jolt · 120 Hz physics
+
+## 1.0.0-beta.1 pass (2026-10-08)
+
+Build: RC Park 1.0.0-beta.1 · versionCode 10000 · Godot 4.7.2.stable · Jolt · 120 Hz physics. Container: software Vulkan (lavapipe) under Xvfb; CPU timings are build-container numbers, not device numbers.
+
+- **Automated suite** `--upgrade-test`: **247 / 247 PASS** on the final code. Before the fixes below, the suite ran at 243/247 and 244/247 on two runs. The failing checks were the production lifecycle (20 real crash / aftermath / replay / repair cycles) and the checks that depend on it.
+- **Gameplay fix — steep dives could stop without a crash.** A nose-down placement at 26 m/s could come to rest on its nose and stay in FLYING state with controls live, because the nose, prop or gear tore away first and the fuselage break threshold was never reached. Any contact with normal closing speed ≥ 15 m/s is now a crash (`CRASH_CLOSING_MPS`, both contact paths). The prop-strike, wingtip-scrape and landing tests are unaffected.
+- **Flight envelope** (`tests/flight_test.tscn`): all 16 aircraft take off with `crash=false`, complete loops, and recover from spins. The "dmg" column in that bench is the peak contact severity while settling, not component damage. Those values (0.16–0.34) match the 0.9.0 baseline exactly.
+- **Model visuals** (turntable, all 16 aircraft reviewed):
+  - Foam/rubber fine grain (Viper 90 white fuselage) shimmered like fur at distance. Now fades out at a few pixels per cycle.
+  - Fabric weave (Skipper fuselage) produced moiré hatching. Fade thresholds moved earlier; carbon weave treated the same way.
+  - Brute 10 pale patch on the fuselage shoulder: checked with shadows off and with a plain vertex-colour material. It is a sun specular highlight on the curved shoulder, not geometry or paint.
+  - Still visible: stair-stepping on coarse paint boundaries (Viper 90 chevrons, Aerostar stripe at close range). The fix is texture-based livery, which is not done.
+- **Performance** (CPU, build container, `tests/boot_timing.gd`):
+
+  | Stage | Before | After |
+  |---|---|---|
+  | Field build (high) | 5.3 s | 4.2 s |
+  | Aircraft build, Skylark (lod 2) | 1.6 s | 1.0 s |
+  | Aircraft build, Viper 90 | 1.7 s | 0.8 s |
+  | Aircraft build, Skyliner | 1.8 s | 1.0 s |
+  | Aircraft build, Belle 51 | 1.7 s | 0.8 s |
+
+  Paint evaluation was about 60–70 % of an aircraft build. Hangar carousel: the last four display aircraft stay built and hidden, and the two neighbours are prebuilt while idle, so swiping no longer waits on a full build (first visit to an aircraft still costs one build).
+- **Packaging:** `build/RCPark-debug.apk` (arm64-v8a, v2/v3-signed, no permissions) and `build/RCPark.aab` (arm64-v8a, targetSdk 36, minSdk 24, validated with bundletool 1.17.2, no permissions). The AAB is signed with a throwaway verification key. Full steps and open items: `docs/PLAY_STORE.md`.
+- **Not verified:** any physical device (frame rate, thermals, touch, audio, back button, resume), a real release-key signature, and a Play Console upload.
 
 ## Test environment (important)
 - All tests were run on a **Linux x86-64 cloud container**: headless Godot for physics/logic tests, and the Vulkan **software rasterizer (lavapipe)** under Xvfb for screenshots.

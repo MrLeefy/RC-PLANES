@@ -1,12 +1,13 @@
 {
-  "version": "0.10.0",
+  "version": "1.0.0-beta.1",
   "package": "com.rcpark.sim.upgrade",
-  "delivery": "source implementation preview",
+  "delivery": "beta candidate: built and tested in a headless build container; not yet run on a physical device",
   "source_changes_implemented": true,
-  "successful_import_verified": false,
-  "regression_pass_verified": false,
-  "rendered_visual_validation_verified": false,
-  "upgraded_apk_built_and_verified": false,
+  "successful_import_verified": true,
+  "regression_pass_verified": true,
+  "rendered_visual_validation_verified": true,
+  "upgraded_apk_built_and_verified": true,
   "physical_android_tested": false,
-  "professional_asset_replacement_completed": false
+  "professional_asset_replacement_completed": false,
+  "notes": "Import clean headless (Godot 4.7.2.stable). --upgrade-test 247/247 on the final code. Rendered checks used the software Vulkan driver (lavapipe): turntable for all aircraft, hangar and flight frames. Debug APK and AAB built; AAB validated with bundletool 1.17.2; the AAB is signed with a throwaway verification key, not a release key. No device, Play Console or real-key verification has been done."
 }

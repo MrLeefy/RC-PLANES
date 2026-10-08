@@ -8,3 +8,6 @@ exports/
 *.jks
 *.log
 .DS_Store
+
+# Generated Android build template (Project -> Install Android Build Template); large and reproducible
+/android/

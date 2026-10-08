@@ -34,6 +34,9 @@ Free flight, Landing practice (graded touchdown), Crosswind, Engine-out, Touch &
 `Wind` pushes `wind_dir/strength/gust` to shader globals, so grass, trees and the windsock match the forces on the aircraft.
 
 ## Performance design
+- Aircraft builds are the main CPU cost (about 0.8–1 s each on the build container). Paint is evaluated per vertex and per anti-aliasing tap, so its fuselage lookup comes from a 257-sample table built once per builder (`AircraftBuilder._paint_fus`).
+- The hangar keeps the last four display aircraft built and hidden (processing disabled). The two carousel neighbours are prebuilt one at a time while the player is idle (`main.gd` `_display_for`, `_prebuild_neighbours`). Workshop edits drop that aircraft's entry, and starting a flight clears the cache.
+- Crash rule: a contact with normal closing speed ≥ `CRASH_CLOSING_MPS` (15 m/s) is a crash, even when the nose, prop or gear tears away first (`aircraft.gd` `_contacts` and the swept-probe path).
 - All crash effects are pooled (chips, particles, debris bodies, audio players) → no allocation at crash time (tested: 50 crashes, object count stable).
 - Static props merged; tree chunks share meshes; visibility ranges + mesh LODs; shadows focused around the camera.
 
