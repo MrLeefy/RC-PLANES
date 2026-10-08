@@ -47,7 +47,8 @@ func _stage() -> void:
 	var sun := DirectionalLight3D.new()
 	sun.rotation_degrees = Vector3(-48, -35, 0)
 	sun.light_energy = 1.25
-	sun.shadow_enabled = true
+	# TT_NOSHADOW=1 renders without the sun's shadow map, to tell lighting artefacts from model defects
+	sun.shadow_enabled = OS.get_environment("TT_NOSHADOW") != "1"
 	add_child(sun)
 	var ground := MeshInstance3D.new()
 	var pl := PlaneMesh.new()
@@ -69,6 +70,14 @@ func _spawn(id: String) -> void:
 	ac = Aircraft.new()
 	ac.setup(AircraftDB.by_id(id), Settings.aircraft_cfg(id), detail, true)
 	add_child(ac)
+	# TT_PLAIN=1 swaps the aircraft shader for plain vertex-colour albedo, to tell shading from geometry
+	if OS.get_environment("TT_PLAIN") == "1":
+		var stack: Array = [ac]
+		while stack.size() > 0:
+			var nd: Node = stack.pop_back()
+			stack.append_array(nd.get_children())
+			if nd is MeshInstance3D:
+				(nd as MeshInstance3D).material_override = MatLib.vcol(0.6, 0.0)
 	var low := 0.0
 	for w in ac.wheels:
 		low = minf(low, (w["center"] as Vector3).y - float(w["r"]))

@@ -44,7 +44,7 @@ void fragment() {
 		r = rough;
 	} else if (kind == 3) {
 		vec2 w = UV * 140.0;
-		float weave = 1.0 - smoothstep(0.25, 0.8, max(fwidth(w.x), fwidth(w.y)));
+		float weave = 1.0 - smoothstep(0.12, 0.4, max(fwidth(w.x), fwidth(w.y)));
 		float cell = floor(w.x) + floor(w.y);
 		bool hor = mod(cell, 4.0) < 2.0;
 		float tow = sin(fract(hor ? w.x : w.y) * 3.14159);
@@ -77,7 +77,8 @@ void fragment() {
 		base *= 1.0 + riv * 0.18 * micro;
 	} else if (kind == 5) {
 		vec2 w = UV * 420.0;
-		float wv = sin(w.x) * sin(w.y) * (1.0 - smoothstep(0.4, 1.6, max(fwidth(w.x), fwidth(w.y))));
+		// the 420 cycles/m weave turns into moire once a cycle is a pixel or two wide; fade it out before that
+		float wv = sin(w.x) * sin(w.y) * (1.0 - smoothstep(0.12, 0.35, max(fwidth(w.x), fwidth(w.y))));
 		base *= 0.95 + wv * 0.05;
 		r = rough + wv * 0.05;
 	} else if (kind == 6) {
