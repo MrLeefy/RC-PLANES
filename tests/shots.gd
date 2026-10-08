@@ -1,10 +1,13 @@
 extends Node
 ## Visual QA: boots the real game, drives it, and saves screenshots.
 var main: Node
-var outdir := "/tmp/shots/"
+var outdir := "/tmp/shots/"   # overridable: second user argument
 func _ready():
 	var args := OS.get_cmdline_user_args()
 	var plan := args[0] if args.size() > 0 else "menu"
+	if args.size() > 1:
+		outdir = args[1]
+	DirAccess.make_dir_recursive_absolute(outdir)
 	main = load("res://scenes/main.tscn").instantiate()
 	add_child(main)
 	var t0 := Time.get_ticks_msec()

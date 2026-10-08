@@ -188,6 +188,22 @@ func _fus_param(z: float) -> Array:
 	# monotone guard for tiny values
 	return out
 
+# Paint is evaluated per vertex and per anti-aliasing tap, so the fuselage lookup it needs (centreline
+# height and half-height along the length) comes from a table built once, not from the spline each time.
+const PAINT_FUS_N := 257
+var _paint_fus_tab := PackedVector2Array()   # Vector2(yc, hh) per station sample
+var _paint_half_span := -1.0
+
+func _paint_fus(z: float) -> Vector2:
+	if _paint_fus_tab.is_empty():
+		_paint_fus_tab.resize(PAINT_FUS_N)
+		for i in PAINT_FUS_N:
+			var fp := _fus_param(length * float(i) / float(PAINT_FUS_N - 1))
+			_paint_fus_tab[i] = Vector2(float(fp[2]), float(fp[1]))
+	var f := clampf(z / maxf(length, 1e-6), 0.0, 1.0) * float(PAINT_FUS_N - 1)
+	var i0 := mini(int(f), PAINT_FUS_N - 2)
+	return _paint_fus_tab[i0].lerp(_paint_fus_tab[i0 + 1], f - float(i0))
+
 ## zone: fus, wing, stab, fin, cowl, nacelle, spinner, blade, strut, gear, pant, frame
 func paint(zone: String, p: Vector3, n: Vector3) -> Color:
 	var base: Color = lv.get("base", Color.WHITE)
@@ -195,12 +211,14 @@ func paint(zone: String, p: Vector3, n: Vector3) -> Color:
 	var a2: Color = lv.get("a2", Color.BLACK)
 	var a3: Color = lv.get("a3", a2)
 	var pa := _paint_alpha()
-	var fp := _fus_param(clampf(p.z, 0.0, length))
-	var yc: float = fp[2]
-	var hh: float = fp[1]
+	var fp := _paint_fus(clampf(p.z, 0.0, length))
+	var yc: float = fp.x
+	var hh: float = fp.y
 	var rel_y := (p.y - yc) / maxf(hh, 0.001)   # -1 bottom .. 1 top
 	var zf := p.z / length
-	var bspan := _max_span() * 0.5
+	if _paint_half_span < 0.0:
+		_paint_half_span = _max_span() * 0.5
+	var bspan := _paint_half_span
 	var s := absf(p.x) / maxf(bspan, 0.01)
 	var col := base
 	var alpha := pa

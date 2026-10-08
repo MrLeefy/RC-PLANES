@@ -146,7 +146,7 @@ func _open_menu() -> void:
 	menu.fly.connect(_start_flight)
 	menu.open_settings.connect(_open_settings)
 	menu.aircraft_changed.connect(_show_display)
-	menu.config_changed.connect(_show_display)
+	menu.config_changed.connect(_on_config_changed)
 	menu.orbit.connect(func(rel): cam.orbit_drag(rel))
 	menu.zoom.connect(func(f): cam.orbit_zoom(f))
 	menu.env_changed.connect(func():
@@ -154,12 +154,82 @@ func _open_menu() -> void:
 		Game.wind.configure(String(Settings.g("environment", "wind", "light")), String(Settings.g("environment", "wind_dir", "headwind")), Vector3(1, 0, 0)))
 	_show_display(menu.sel_id)
 
+## Hangar display aircraft are expensive to build (~1 s of CPU each), so the last few stay built, hidden and
+## idle. The carousel neighbours are built while the player is idle, so swiping does not stall the frame.
+const DISPLAY_CACHE_MAX := 4
+var _display_cache: Dictionary = {}   # id -> Aircraft (hidden unless it is the shown display)
+var _display_lru: Array = []          # ids, least recently shown first
+var _prebuild_pending := false
+
+func _display_for(id: String) -> Aircraft:
+	if _display_cache.has(id) and is_instance_valid(_display_cache[id]):
+		_display_lru.erase(id)
+		_display_lru.append(id)
+		return _display_cache[id]
+	var ac := Aircraft.new()
+	ac.setup(AircraftDB.by_id(id), Settings.aircraft_cfg(id), 2, true)
+	ac.visible = false
+	ac.process_mode = Node.PROCESS_MODE_DISABLED
+	world.add_child(ac)
+	_display_cache[id] = ac
+	_display_lru.append(id)
+	while _display_lru.size() > DISPLAY_CACHE_MAX:
+		var victim := ""
+		for k in _display_lru:
+			if _display_cache.get(k) != display_ac:
+				victim = String(k)
+				break
+		if victim == "":
+			break
+		_drop_display(victim)
+	return ac
+
+func _drop_display(id: String) -> void:
+	_display_lru.erase(id)
+	if _display_cache.has(id):
+		var ac = _display_cache[id]
+		_display_cache.erase(id)
+		if is_instance_valid(ac):
+			if ac == display_ac:
+				display_ac = null
+			ac.queue_free()
+
+func _clear_display_cache() -> void:
+	for id in _display_cache.keys():
+		_drop_display(String(id))
+	display_ac = null
+
+func _on_config_changed(id: String) -> void:
+	_drop_display(id)
+	_show_display(id)
+
+## At most one prebuild is pending, so rapid swiping cannot queue several one-second builds.
+func _schedule_prebuild(delay := 0.3) -> void:
+	if _prebuild_pending:
+		return
+	_prebuild_pending = true
+	get_tree().create_timer(delay).timeout.connect(_prebuild_neighbours)
+
+func _prebuild_neighbours() -> void:
+	_prebuild_pending = false
+	if state != "menu" or menu == null or not is_instance_valid(menu):
+		return
+	var ids := AircraftDB.ids()
+	var i := ids.find(menu.sel_id)
+	for j in [i + 1, i - 1]:
+		if j >= 0 and j < ids.size() and not _display_cache.has(ids[j]):
+			_display_for(ids[j])
+			_schedule_prebuild(0.15)
+			return
+
 func _show_display(id: String) -> void:
 	if display_ac and is_instance_valid(display_ac):
-		display_ac.queue_free()
-	display_ac = Aircraft.new()
-	display_ac.setup(AircraftDB.by_id(id), Settings.aircraft_cfg(id), 2, true)
-	world.add_child(display_ac)
+		display_ac.visible = false
+		display_ac.process_mode = Node.PROCESS_MODE_DISABLED
+	display_ac = _display_for(id)
+	display_ac.visible = true
+	display_ac.process_mode = Node.PROCESS_MODE_INHERIT
+	_schedule_prebuild()
 	var low := 0.0
 	for w in display_ac.wheels:
 		low = minf(low, (w["center"] as Vector3).y - float(w["r"]))
@@ -198,9 +268,7 @@ func _start_flight() -> void:
 	var mode_id := String(Settings.data.get("last_mode", "free"))
 	menu.queue_free()
 	menu = null
-	if display_ac and is_instance_valid(display_ac):
-		display_ac.queue_free()
-		display_ac = null
+	_clear_display_cache()
 	field.set_time_of_day(String(Settings.g("environment", "time", "golden")))
 	flight = Flight.new()
 	flight.name = "Flight"
