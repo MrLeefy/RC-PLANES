@@ -59,6 +59,9 @@ func _stage() -> void:
 	gm.roughness = 0.95
 	ground.material_override = gm
 	add_child(ground)
+	# TT_LOD0=1 forces the finest mesh level (mesh_lod_threshold 0), to tell LOD choice from geometry
+	if OS.get_environment("TT_LOD0") == "1":
+		get_viewport().mesh_lod_threshold = 0.0
 	cam = Camera3D.new()
 	cam.fov = 38.0
 	cam.keep_aspect = Camera3D.KEEP_WIDTH

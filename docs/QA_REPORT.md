@@ -13,7 +13,7 @@ Build: RC Park 1.0.0-beta.1 · versionCode 10000 · Godot 4.7.2.stable · Jolt �
   - Foam/rubber fine grain (Viper 90 white fuselage) shimmered like fur at distance. Now fades out at a few pixels per cycle.
   - Fabric weave (Skipper fuselage) produced moiré hatching. Fade thresholds moved earlier; carbon weave treated the same way.
   - Brute 10 pale patch on the fuselage shoulder: checked with shadows off and with a plain vertex-colour material. It is a sun specular highlight on the curved shoulder, not geometry or paint.
-  - Still visible: stair-stepping on coarse paint boundaries (Viper 90 chevrons, Aerostar stripe at close range). The fix is texture-based livery, which is not done.
+  - Still visible: stair-stepping on coarse paint boundaries (Viper 90 chevrons, Aerostar and Valor stripes at close range), and soft dark smears where the Ridgeline and Tundra Cub stripes and wing bands meet. The smears are not LOD selection (forced finest LOD, `TT_LOD0=1`, looks the same). The fix is texture-based livery, which is not done.
 - **Performance** (CPU, build container, `tests/boot_timing.gd`):
 
   | Stage | Before | After |
