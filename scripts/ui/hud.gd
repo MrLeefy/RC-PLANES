@@ -172,6 +172,10 @@ func _update_buttons() -> void:
 	for b in btn.values():
 		(b as TouchButton).queue_redraw()
 
+const READOUT_PERIOD := 0.1
+var _readout_t := 0.0
+var _readout_ticks := 0
+
 func _process(delta: float) -> void:
 	if is_instance_valid(cam) and cam is CameraRig:
 		orbit_pad.visible = cam.mode == "free"
@@ -185,10 +189,17 @@ func _process(delta: float) -> void:
 		land_t -= delta
 		if land_t <= 0.0:
 			land_panel.visible = false
+	# Readouts refresh at 10 Hz: nobody reads digits at 60 Hz, and rebuilding and re-shaping several
+	# labels (plus the telemetry dictionary) every frame was a visible share of the frame time on phones.
+	_readout_t -= delta
+	if _readout_t > 0.0:
+		return
+	_readout_t = READOUT_PERIOD
+	_readout_ticks += 1
 	if Settings.g("graphics", "show_fps", false):
 		var st := Diag.stats()
 		fps_label.text = "%.0f fps  1%%low %.0f  worst %.1f ms  draws %d" % [Engine.get_frames_per_second(), st.get("low1_fps", 0.0), st.get("worst_ms", 0.0), RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME)]
-	else:
+	elif fps_label.text != "":
 		fps_label.text = ""
 	if ac == null or not is_instance_valid(ac):
 		return
@@ -212,8 +223,9 @@ func _process(delta: float) -> void:
 		elif float(c["hp"]) < 0.6:
 			dmg.append(_pretty(String(c["id"])) + " damaged")
 	dmg_label.text = "\n".join(dmg.slice(0, 4))
-	wind_arrow.queue_redraw()
-	if Engine.get_process_frames() % 10 == 0:
+	if _readout_ticks % 3 == 0:
+		wind_arrow.queue_redraw()
+	if _readout_ticks % 2 == 0:
 		_update_buttons()
 
 func _pretty(id: String) -> String:

@@ -325,7 +325,8 @@ func t_aircraft(id: String) -> void:
 		var restored := 0
 		for w in a.wheels:
 			var rt2 := a.build_part(int(w["retract_part"]))
-			if rt2 and rt2.basis.is_equal_approx(Basis()):
+			# fully down the leg sits at its bend angle (a touchdown bump leaves a small permanent bend), not at 0
+			if rt2 and rt2.basis.get_rotation_quaternion().get_angle() <= float(w["bent"]) * 0.35 + 0.002:
 				restored += 1
 			elif rt2:
 				gdetail += " [wheel tail=%s bent=%.3f angle=%.3f]" % [w["tail"], float(w["bent"]), rt2.basis.get_rotation_quaternion().get_angle()]

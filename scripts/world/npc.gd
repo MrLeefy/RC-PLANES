@@ -117,12 +117,23 @@ func _build_visual() -> void:
 		arm.add_child(ami)
 		arms.append(arm)
 
+## Walking, fleeing and posing need display rate, not physics rate: running them (and moving a physics body)
+## 120 times a second for every spectator was a measurable slice of each tick. Knock-downs and getting up
+## stay at full rate.
+const STEP := 1.0 / 60.0
+var _acc := 0.0
+
 func _physics_process(delta: float) -> void:
 	if down:
 		down_t += delta
 		if down_t > 4.5 and linear_velocity.length() < 0.3:
 			_get_up()
 		return
+	_acc += delta
+	if _acc < STEP - 0.0001:
+		return
+	delta = _acc
+	_acc = 0.0
 	var pos := global_position
 	var danger := _danger()
 	if danger != Vector3.ZERO:

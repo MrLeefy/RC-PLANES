@@ -82,8 +82,6 @@ var sim_t := 0.0
 var wing_cl := 0.0
 var g_load := 1.0
 var last_vel := Vector3.ZERO
-var foliage: Array = []
-var foliage_sensor: Area3D
 
 # damage bookkeeping
 var shape_nodes: Array = []  # CollisionShape3D
@@ -212,7 +210,6 @@ func setup(definition: Dictionary, config: Dictionary, detail_level := 2, for_di
 		continuous_cd = false
 	else:
 		_build_debris_pool()
-		_build_foliage_sensor()
 	_ray_params = PhysicsRayQueryParameters3D.new()
 	_ray_params.collision_mask = Game.L_WORLD | Game.L_NPC
 	_ray_params.exclude = [get_rid()]
@@ -359,20 +356,6 @@ func _attach_debris_root() -> void:
 		get_parent().add_child(debris_root)
 		debris_root.process_mode = Node.PROCESS_MODE_PAUSABLE
 
-func _build_foliage_sensor() -> void:
-	foliage_sensor = Area3D.new()
-	foliage_sensor.name = "FoliageSensor"
-	foliage_sensor.collision_layer = 0
-	foliage_sensor.collision_mask = Game.L_FOLIAGE
-	foliage_sensor.monitorable = false
-	var cs := CollisionShape3D.new()
-	var bs := BoxShape3D.new()
-	bs.size = Vector3(span * 0.9, maxf(span * 0.15, 0.15), length_m * 0.9)
-	cs.shape = bs
-	cs.position = Vector3(0, 0, length_m * 0.45)
-	foliage_sensor.add_child(cs)
-	add_child(foliage_sensor)
-
 func _descendants(ci: int) -> Array:
 	var out = []
 	for ch in comps[ci]["children"]:
@@ -479,9 +462,6 @@ func _physics_process(delta: float) -> void:
 	var target := 1.0 if gear_down else 0.0
 	gear_pos = move_toward(gear_pos, target, delta / 2.2)
 	flap_pos = move_toward(flap_pos, flap_cmd, delta / 1.2)
-	# foliage list refresh
-	if foliage_sensor and Engine.get_physics_frames() % 4 == 0:
-		foliage = foliage_sensor.get_overlapping_areas()
 	# forget old breaks
 	while recent_breaks.size() > 0 and sim_t - float(recent_breaks[0]) > 0.6:
 		recent_breaks.pop_front()
@@ -598,8 +578,8 @@ func _integrate_forces(state: PhysicsDirectBodyState3D) -> void:
 	T += rb.cross(fd)
 	# rotational damping of the body shape itself (fuselage cross-flow) - small
 	T += -w_l * w_l.length() * 0.5 * RHO * float(body_drag["side_cda"]) * length_m * length_m * 0.004
-	# ---- foliage (bush/canopy volumes) ----
-	if not foliage.is_empty():
+	# ---- foliage (bush/canopy volumes); trees are never taller than ~40 m ----
+	if agl < 45.0 and not display_only:
 		_foliage_forces(dt, com_w, v_w, B, Bt, F, T)
 		F += _fol_F
 		T += _fol_T
@@ -627,10 +607,6 @@ func _foliage_forces(dt: float, com_w: Vector3, v_w: Vector3, _B: Basis, Bt: Bas
 	_fol_F = Vector3.ZERO
 	_fol_T = Vector3.ZERO
 	var spd := v_w.length()
-	for a in foliage:
-		if is_instance_valid(a):
-			_apply_canopy(dt, com_w, v_w, Bt, spd, a.get_meta("center", a.global_position),
-				float(a.get_meta("radius", 2.0)), float(a.get_meta("density", 0.5)))
 	if is_instance_valid(Game.field):
 		Game.field.outer_canopies.query(com_w, span * 0.5, _outer_foliage)
 		for crown in _outer_foliage:
@@ -1760,7 +1736,6 @@ func restore(s: Dictionary) -> void:
 		recent_breaks = s["breaks"].duplicate()
 		_restore_debris(s["debris"])
 	pending_mass_update = false
-	foliage.clear()
 	vis_xf = s["xf"]
 	update_visuals(vis_xf, 0.0)
 
@@ -1827,9 +1802,13 @@ func update_visuals(xf: Transform3D, delta: float) -> void:
 				vis.global_transform = rb.global_transform * Transform3D(Basis(), -center)
 			else:
 				vis.visible = false
-		else:
+			c["_vis_free"] = true
+		elif c.get("_vis_free", true):
+			# Assigning a transform makes the scene tree propagate a change, so it is only done on the
+			# frame a part comes back from being debris (or the first frame), not for every part every frame.
 			vis.transform = Transform3D()
 			vis.visible = true
+			c["_vis_free"] = false
 	_animate(delta)
 
 func _animate(delta: float) -> void:
@@ -1840,9 +1819,13 @@ func _animate(delta: float) -> void:
 		var c_owner := int(replay_owners[child]) if replay_driven and replay_owners.size() == comps.size() else int(comps[child]["debris"])
 		for node in cut["nodes"]: (node as MeshInstance3D).visible = p_owner != c_owner
 	for s in surfaces:
+		var defl := float(s["defl"])
+		if defl == float(s.get("_vd", 1e9)):
+			continue
 		var part: Node3D = build_part(int(s["part"]))
 		if part:
-			part.basis = Basis((s["axis"] as Vector3), float(s["defl"]))
+			s["_vd"] = defl
+			part.basis = Basis((s["axis"] as Vector3), defl)
 	for ei in engines.size():
 		var e: Propulsion = engines[ei]
 		var ed: Dictionary = eng_defs[ei]
@@ -1908,8 +1891,13 @@ func _is_comp_visual(n: Node) -> bool:
 	return false
 
 func _comp_mesh(c: Dictionary) -> MeshInstance3D:
+	if c.has("_mesh_node"):
+		var cached = c["_mesh_node"]
+		return cached if is_instance_valid(cached) else null
 	var v: Node3D = c["visual"]
-	return v.get_node_or_null("Mesh") as MeshInstance3D if v else null
+	var mi := v.get_node_or_null("Mesh") as MeshInstance3D if v else null
+	c["_mesh_node"] = mi
+	return mi
 
 func build_part(i: int) -> Node3D:
 	if i < 0:

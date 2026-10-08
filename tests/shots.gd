@@ -97,6 +97,8 @@ func _do(step: String):
 				await get_tree().process_frame
 				if parts.size() > 2 and i > 0 and i % int(parts[2]) == 0:
 					await _shot("auto_%d" % i)
+		"budget":
+			await _budget()
 		"hud":
 			main.flight._on_hud(parts[1]); await _frames(int(parts[2]) if parts.size() > 2 else 20)
 		"killact":
@@ -119,3 +121,44 @@ func _do(step: String):
 			main.cam.look_at(Vector3(float(parts[4]), float(parts[5]), float(parts[6])))
 			main.cam.fov = float(parts[7]) if parts.size() > 7 else 60.0
 			await _frames(4)
+
+## Rendering budget: draw calls / primitives / objects with each scene category switched off in turn.
+## Counts, not timings: software rendering says nothing about phone GPU speed, but these numbers are what
+## a mobile GPU and driver pay for.
+func _frame_stats() -> Array:
+	await _frames(3)
+	await RenderingServer.frame_post_draw
+	return [RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_DRAW_CALLS_IN_FRAME),
+		RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_PRIMITIVES_IN_FRAME),
+		RenderingServer.get_rendering_info(RenderingServer.RENDERING_INFO_TOTAL_OBJECTS_IN_FRAME)]
+
+func _set_vis(nodes: Array, v: bool) -> void:
+	for n in nodes:
+		if is_instance_valid(n):
+			n.visible = v
+
+func _budget() -> void:
+	var f: Field = main.field
+	var base := await _frame_stats()
+	print("BUDGET base: draws=%d prims=%d objs=%d" % base)
+	var grass: Array = f.grass_nodes.duplicate()
+	var trees: Array = f.near_tree_nodes.duplicate()
+	trees.append_array(f.far_tree_nodes)
+	var other_mm: Array = []
+	var meshes: Array = []
+	for c in f.get_children():
+		if c is MultiMeshInstance3D and not (c in grass) and not (c in trees):
+			other_mm.append(c)
+		elif c is MeshInstance3D and not (c in trees):
+			meshes.append(c)
+	var cats := {"grass": grass, "trees": trees, "field meshes": meshes, "other multimesh": other_mm,
+		"npcs": f.npcs, "parked aircraft": f.parked, "flight aircraft": [main.flight.aircraft.visual_root] if main.flight else []}
+	for k in cats.keys():
+		_set_vis(cats[k], false)
+		var st := await _frame_stats()
+		print("BUDGET -%-16s (%3d nodes): draws %4d (%+d)  prims %7d (%+d)  objs %4d" % [k, (cats[k] as Array).size(), st[0], st[0] - base[0], st[1], st[1] - base[1], st[2]])
+		_set_vis(cats[k], true)
+	f.sun.shadow_enabled = false
+	var ns := await _frame_stats()
+	print("BUDGET -sun shadows                  : draws %4d (%+d)  prims %7d (%+d)  objs %4d" % [ns[0], ns[0] - base[0], ns[1], ns[1] - base[1], ns[2]])
+	f.sun.shadow_enabled = true

@@ -1120,24 +1120,11 @@ func _tree_physics(pl: Array, v: Dictionary) -> void:
 			bas.z = bas.x.cross(bas.y)
 			cs2.transform = Transform3D(bas.orthonormalized(), mid)
 			body.add_child(cs2)
-	# soft foliage volumes
+	# soft foliage volumes: analytic spheres in the canopy index, queried by the aircraft. (They used to be
+	# one Area3D each, which put over a thousand sensors into the physics space for nothing.)
+	var dens := 1.0 if species in ["bush", "hedge"] else (0.8 if species == "pine" else 0.6)
 	for c in v["canopy"]:
-		var ar := Area3D.new()
-		ar.collision_layer = Game.L_FOLIAGE
-		ar.collision_mask = 0
-		ar.monitoring = false
-		ar.monitorable = true
-		var cs3 := CollisionShape3D.new()
-		var sp := SphereShape3D.new()
-		sp.radius = float(c[1]) * s * 0.85
-		cs3.shape = sp
-		ar.add_child(cs3)
-		var cpos: Vector3 = p + b * (c[0] as Vector3)
-		ar.position = cpos
-		ar.set_meta("center", cpos)
-		ar.set_meta("radius", sp.radius)
-		ar.set_meta("density", 1.0 if species in ["bush", "hedge"] else (0.8 if species == "pine" else 0.6))
-		add_child(ar)
+		outer_canopies.add(p + b * (c[0] as Vector3), float(c[1]) * s * 0.85, dens)
 
 func _bush(p: Vector3, species: String, idx: int) -> void:
 	var v := _variant(species, idx % 3, false)

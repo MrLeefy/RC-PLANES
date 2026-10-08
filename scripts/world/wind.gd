@@ -73,12 +73,24 @@ func sample(p: Vector3) -> Vector3:
 		w += tv * base_speed * turb * 2.2
 	return w
 
+var _pushed_dir := Vector2(1e9, 1e9)
+var _pushed_strength := 1e9
+var _pushed_gust := 1e9
+
+## Every global shader parameter write touches the renderer's uniform buffer, so only changes that
+## grass, trees and the windsock could actually show are pushed.
 func push_shader_globals() -> void:
 	var dir2 := Vector2(base_dir.x, base_dir.z)
-	RenderingServer.global_shader_parameter_set("wind_dir", dir2)
-	var s := speed_at_height(2.0) * (1.0 + gust_amp * gust_now)
-	RenderingServer.global_shader_parameter_set("wind_strength", clampf(s / 8.0, 0.0, 1.5))
-	RenderingServer.global_shader_parameter_set("wind_gust", gust_now)
+	if dir2.distance_to(_pushed_dir) > 0.002:
+		_pushed_dir = dir2
+		RenderingServer.global_shader_parameter_set("wind_dir", dir2)
+	var s := clampf(speed_at_height(2.0) * (1.0 + gust_amp * gust_now) / 8.0, 0.0, 1.5)
+	if absf(s - _pushed_strength) > 0.004:
+		_pushed_strength = s
+		RenderingServer.global_shader_parameter_set("wind_strength", s)
+	if absf(gust_now - _pushed_gust) > 0.01:
+		_pushed_gust = gust_now
+		RenderingServer.global_shader_parameter_set("wind_gust", gust_now)
 
 func describe() -> String:
 	if base_speed <= 0.01:
