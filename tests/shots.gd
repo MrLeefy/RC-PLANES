@@ -54,6 +54,17 @@ func _do(step: String):
 			main.flight.set_throttle(float(parts[1]))
 		"wait":
 			await _frames(int(parts[1]))
+		"skyview":
+			# free camera at 30 m looking up: skyview:<pitch_deg>:<name>
+			var sc := Camera3D.new()
+			main.add_child(sc)
+			sc.fov = 70.0
+			sc.global_position = Vector3(0, 30, 0)
+			sc.rotation_degrees = Vector3(float(parts[1]), 90.0, 0.0)
+			sc.make_current()
+			await _frames(6)
+			await _shot(parts[2])
+			sc.queue_free()
 		"cam":
 			main.cam.set_mode(parts[1]); main.flight.flight_cam_mode = parts[1]; await _frames(6)
 		"shot":
@@ -99,6 +110,12 @@ func _do(step: String):
 					await _shot("auto_%d" % i)
 		"budget":
 			await _budget()
+		"budgetfast":
+			await _frames(5)
+			var tb := Time.get_ticks_usec()
+			for _i in 12:
+				await RenderingServer.frame_post_draw
+			print("BUDGET frame time: %.0f ms (software rendering, relative only)" % (float(Time.get_ticks_usec() - tb) / 12000.0))
 		"hud":
 			main.flight._on_hud(parts[1]); await _frames(int(parts[2]) if parts.size() > 2 else 20)
 		"killact":
@@ -141,6 +158,12 @@ func _budget() -> void:
 	var f: Field = main.field
 	var base := await _frame_stats()
 	print("BUDGET base: draws=%d prims=%d objs=%d" % base)
+	# software-rasteriser frame time: a relative measure of fragment + vertex work (not phone speed)
+	await _frames(5)
+	var t0 := Time.get_ticks_usec()
+	for _i in 12:
+		await RenderingServer.frame_post_draw
+	print("BUDGET frame time: %.0f ms (software rendering, relative only)" % (float(Time.get_ticks_usec() - t0) / 12000.0))
 	var grass: Array = f.grass_nodes.duplicate()
 	var trees: Array = f.near_tree_nodes.duplicate()
 	trees.append_array(f.far_tree_nodes)

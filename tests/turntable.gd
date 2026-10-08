@@ -4,6 +4,8 @@ extends Node3D
 ##   VK_ICD_FILENAMES=/usr/share/vulkan/icd.d/lvp_icd.json xvfb-run -a godot --path . \
 ##     --rendering-driver vulkan --resolution 1280x720 res://tests/turntable.tscn -- <id|all> [views] [outdir]
 ## views: comma list of  q (3/4 front) s (side) t (top) f (front) r (rear 3/4) n (nose close) u (underside) g (gear up, q view)
+##   os / ot / of: orthographic black-on-white silhouettes (side, plan, front) at a known scale, for overlaying on
+##   real three-view drawings; each also writes <id>_<view>.json with pixels-per-metre and the world point at the image centre
 var ac: Aircraft
 var cam: Camera3D
 var outdir := "/tmp/tt/"
@@ -97,7 +99,94 @@ func _spawn(id: String) -> void:
 	ac.gear_pos = 1.0
 	ac.update_visuals(ac.global_transform, 0.0)
 
+func _silhouette(id: String, v: String) -> void:
+	var L := ac.length_m
+	var S := ac.span
+	# level flight attitude, not the tail-down ground stance the other views use
+	var rest_xf := ac.global_transform
+	ac.global_transform = Transform3D(Basis(), Vector3(0, 1.0, 0))
+	ac.update_visuals(ac.global_transform, 0.0)
+	var low := 0.0
+	var high := 0.0
+	var stack: Array = [ac]
+	var saved: Array = []
+	var black := StandardMaterial3D.new()
+	black.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	black.albedo_color = Color.BLACK
+	black.cull_mode = BaseMaterial3D.CULL_DISABLED
+	while stack.size() > 0:
+		var nd: Node = stack.pop_back()
+		stack.append_array(nd.get_children())
+		if nd is MeshInstance3D:
+			var mi := nd as MeshInstance3D
+			saved.append([mi, mi.material_override, mi.cast_shadow])
+			mi.material_override = black
+			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			var bb := mi.global_transform * mi.get_aabb()
+			low = minf(low, bb.position.y)
+			high = maxf(high, bb.end.y)
+	var env := (get_children().filter(func(c): return c is WorldEnvironment)[0] as WorldEnvironment).environment
+	var old_bg := env.background_mode
+	var old_amb := env.ambient_light_source
+	env.background_mode = Environment.BG_COLOR
+	env.background_color = Color.WHITE
+	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
+	env.ambient_light_color = Color.WHITE
+	env.tonemap_mode = Environment.TONE_MAPPER_LINEAR
+	for c in get_children():
+		if c is MeshInstance3D and c != ac:
+			c.visible = false
+		if c is DirectionalLight3D:
+			c.visible = false
+	var vw := float(get_window().size.x)
+	var vh := float(get_window().size.y)
+	var height := high - low
+	var need_h := L if v == "os" else S
+	var need_v := (L if v == "ot" else height)
+	var width := maxf(need_h, need_v * vw / vh) * 1.1
+	var ppm := vw / width
+	var ctr := Vector3(0.0, (low + high) * 0.5, L * 0.5)
+	match v:
+		"os":
+			cam.global_position = ctr + Vector3(-50, 0, 0)
+			cam.look_at(ctr, Vector3.UP)
+		"ot":
+			cam.global_position = ctr + Vector3(0, 50, 0)
+			cam.look_at(ctr, Vector3(0, 0, -1))
+		"of":
+			cam.global_position = ctr + Vector3(0, 0, -50)
+			cam.look_at(ctr, Vector3.UP)
+	cam.projection = Camera3D.PROJECTION_ORTHOGONAL
+	cam.size = width
+	cam.near = 0.05
+	cam.far = 200.0
+	await get_tree().process_frame
+	await get_tree().process_frame
+	await RenderingServer.frame_post_draw
+	get_viewport().get_texture().get_image().save_png("%s%s_%s.png" % [outdir, id, v])
+	# screen right is +Z (side: nose on the left), +X (plan: nose at the top) or -X (front, seen from ahead)
+	var meta := {"id": id, "view": v, "px_per_m": ppm, "image_w": vw, "image_h": vh, "span_m": S, "length_m": L,
+		"center_world": [ctr.x, ctr.y, ctr.z], "note": "side: right=+z (tail), up=+y; plan: right=+x, up=-z (nose at top); front: right=-x, up=+y; nose at z=0"}
+	var f := FileAccess.open("%s%s_%s.json" % [outdir, id, v], FileAccess.WRITE)
+	f.store_string(JSON.stringify(meta))
+	f.close()
+	for e in saved:
+		(e[0] as MeshInstance3D).material_override = e[1]
+		(e[0] as MeshInstance3D).cast_shadow = e[2]
+	env.background_mode = old_bg
+	env.ambient_light_source = old_amb
+	env.tonemap_mode = Environment.TONE_MAPPER_FILMIC
+	for c in get_children():
+		if c is MeshInstance3D or c is DirectionalLight3D:
+			c.visible = true
+	cam.projection = Camera3D.PROJECTION_PERSPECTIVE
+	ac.global_transform = rest_xf
+	ac.update_visuals(ac.global_transform, 0.0)
+
 func _view(id: String, v: String) -> void:
+	if v in ["os", "ot", "of"]:
+		await _silhouette(id, v)
+		return
 	var L := ac.length_m
 	var S := ac.span
 	var ctr := ac.global_transform * Vector3(0, 0.0, L * 0.5)

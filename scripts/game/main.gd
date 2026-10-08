@@ -20,6 +20,7 @@ var _auto_t := 0.0
 var _frame_acc := 0.0
 var _frame_n := 0
 var scaler := AdaptiveScale.new()
+var phys_gov := PhysicsGovernor.new()
 
 func _ready() -> void:
 	get_tree().set_quit_on_go_back(false)
@@ -119,6 +120,7 @@ func _apply_graphics() -> void:
 	var q := String(Settings.g("graphics", "quality", "high"))
 	var vp := get_viewport()
 	scaler.configure(float(Settings.g("graphics", "render_scale", 0.85)), int(Settings.g("graphics", "fps", 60)), q == "ultra")
+	phys_gov.configure(int(Settings.g("graphics", "fps", 60)))
 	_scale = scaler.scale
 	vp.scaling_3d_mode = Viewport.SCALING_3D_MODE_BILINEAR
 	vp.scaling_3d_scale = _scale
@@ -129,12 +131,30 @@ func _apply_graphics() -> void:
 		field.apply_quality(q)
 
 func _process(delta: float) -> void:
+	_govern_physics(delta)
 	if not bool(Settings.g("graphics", "auto_scale", true)) or state == "loading" or get_tree().paused:
 		return
 	if scaler.update(delta, Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS)):
 		_scale = scaler.scale
 		get_viewport().scaling_3d_scale = _scale
 		Diag.log_event("Render scale %.3f: %s" % [_scale, scaler.reason])
+
+## Drops the physics tick rate only while the plane is high in the air and the CPU is the limit; see
+## PhysicsGovernor. Anything near the ground, crashed, paused or in a replay runs at the full 120 Hz.
+func _govern_physics(delta: float) -> void:
+	var want := PhysicsGovernor.FULL_HZ
+	if bool(Settings.g("graphics", "adaptive_physics", true)) and state == "flight" and is_instance_valid(flight) \
+			and flight.state == Flight.S.FLYING and not get_tree().paused and is_instance_valid(flight.aircraft):
+		var a: Aircraft = flight.aircraft
+		var agl := minf(a.agl, a.terrain_agl) if a.altitude_valid else a.agl
+		var ticks := float(Engine.physics_ticks_per_second) * delta
+		var cpu := Performance.get_monitor(Performance.TIME_PROCESS) + Performance.get_monitor(Performance.TIME_PHYSICS_PROCESS) * ticks
+		want = phys_gov.update(delta, cpu, agl, a.on_ground or a.crashed_flag)
+	else:
+		phys_gov.update(delta, 0.0, 0.0, true)
+	if want != Engine.physics_ticks_per_second:
+		Engine.physics_ticks_per_second = want
+		Diag.log_event("Physics %d Hz: %s" % [want, phys_gov.reason])
 
 # ================================================================ hangar
 func _open_menu() -> void:

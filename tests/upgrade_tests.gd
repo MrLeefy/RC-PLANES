@@ -12,6 +12,8 @@ class ContactProbe extends RigidBody3D:
 func _run_all() -> void:
 	await super._run_all()
 	t_scale()
+	t_physics_governor()
+	t_device_tier()
 	t_store_and_validation()
 	t_ghost_validation()
 	t_foliage_index()
@@ -39,6 +41,42 @@ func t_scale() -> void:
 	_ok("scale: physics bottleneck does not destroy pixel quality", is_equal_approx(s.scale, 0.85))
 	s.update(NAN)
 	_ok("scale: invalid timing resets sampling without NaN", is_finite(s.scale) and s.samples == 0)
+
+func t_physics_governor() -> void:
+	var g := PhysicsGovernor.new()
+	g.configure(60)
+	var dt := 1.0 / 60.0
+	# a healthy phone stays at 120 Hz
+	for i in 60 * 30: g.update(dt, 0.004, 40.0, false)
+	_ok("physics governor: healthy CPU stays at 120 Hz", g.hz == 120)
+	# CPU-bound slow frames high in the air step down to the 60 Hz floor and stay there
+	for i in 60 * 30: g.update(1.0 / 40.0, 0.022, 40.0, false)
+	_ok("physics governor: CPU-bound frames drop to 60 Hz while high", g.hz == 60, str(g.hz))
+	# GPU-bound slow frames (little CPU time) must not touch the physics rate
+	var h := PhysicsGovernor.new()
+	h.configure(60)
+	for i in 60 * 30: h.update(1.0 / 40.0, 0.004, 40.0, false)
+	_ok("physics governor: GPU-bound frames keep 120 Hz", h.hz == 120)
+	# near the ground, grounded or crashed: 120 Hz immediately
+	_ok("physics governor: approach returns to 120 Hz", g.update(dt, 0.022, 4.0, false) == 120)
+	for i in 60 * 3: g.update(1.0 / 40.0, 0.022, 3.0, false)
+	_ok("physics governor: stays 120 Hz below the low-altitude gate", g.hz == 120)
+	_ok("physics governor: grounded forces 120 Hz", g.update(dt, 0.022, 80.0, true) == 120)
+	# after climbing out it resumes the reduced rate
+	var resumed := 120
+	for i in 60 * 6: resumed = g.update(1.0 / 40.0, 0.022, 40.0, false)
+	_ok("physics governor: resumes reduced rate after climb-out", resumed < 120, str(resumed))
+	g.update(NAN, 0.0, 40.0, false)
+	_ok("physics governor: invalid timing is ignored", g.hz in PhysicsGovernor.STEPS)
+
+func t_device_tier() -> void:
+	_ok("device tier: flagship phone gets full defaults", Settings.device_tier(12000, 8, "Adreno (TM) 750", true) == 2)
+	_ok("device tier: mid-range phone gets reduced resolution", Settings.device_tier(6000, 8, "Mali-G57 MC2", true) == 1)
+	_ok("device tier: entry phone gets performance preset", Settings.device_tier(3000, 8, "Mali-G52", true) == 0)
+	_ok("device tier: desktop is unaffected", Settings.device_tier(0, 4, "", false) == 2)
+	for t in [0, 1, 2]:
+		var g := Settings.tier_graphics(t)
+		_ok("device tier %d: preset passes validation" % t, Settings.validate({"graphics": g})["graphics"]["quality"] == g["quality"])
 
 func t_store_and_validation() -> void:
 	var path := "user://upgrade_store_test.json"

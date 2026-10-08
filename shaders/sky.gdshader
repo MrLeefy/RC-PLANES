@@ -11,6 +11,9 @@ uniform float cloud_dark = 0.35;
 uniform vec3 cloud_col : source_color = vec3(1.0, 0.98, 0.95);
 uniform vec2 cloud_offset = vec2(0.0);
 uniform float exposure = 1.0;
+// Cloud noise baked at load (scripts/world/terrain_bake.gd). One tile spans 16 / 1.3 sky-plane units.
+uniform sampler2D cloud_noise : filter_linear_mipmap, repeat_enable;
+uniform bool use_cloud_noise = false;
 
 vec3 base_sky(vec3 d, vec3 sd) {
 	float y = d.y;
@@ -31,8 +34,16 @@ void sky() {
 		col += sun_tint * LIGHT0_ENERGY * (smoothstep(0.99986, 0.99992, sdot) * 14.0 * sun_disc + pow(sdot, 900.0) * 0.8 * glow + pow(sdot, 90.0) * 0.12 * glow);
 		if (d.y > -0.02) {
 			vec2 uv = d.xz / (d.y + 0.14) * 0.9 + cloud_offset;
-			float n = fbm2(uv * 1.3);
-			float n2v = n2(uv * 5.0);
+			float n;
+			float n2v;
+			if (use_cloud_noise) {
+				vec2 nn = texture(cloud_noise, uv * (1.3 / 16.0)).rg;
+				n = nn.r;
+				n2v = nn.g;
+			} else {
+				n = fbm2(uv * 1.3);
+				n2v = n2(uv * 5.0);
+			}
 			float cov = smoothstep(1.0 - cloud_cov, 1.0 - cloud_cov + 0.28, n + n2v * 0.08);
 			float thick = clamp((n - (1.0 - cloud_cov)) * 2.5, 0.0, 1.0);
 			vec3 lit = cloud_col * mix(vec3(1.0), sun_tint, 0.5) * (0.85 + 0.6 * pow(sdot, 5.0));

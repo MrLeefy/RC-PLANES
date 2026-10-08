@@ -49,7 +49,7 @@ func defaults() -> Dictionary:
 			"left_handed": false, "throttle_brake": true, "haptics": true,
 		},
 		"graphics": {
-			"quality": "high", "render_scale": 0.85, "fps": 60, "auto_scale": true,
+			"quality": "high", "render_scale": 0.85, "fps": 60, "auto_scale": true, "adaptive_physics": true,
 			"grass": 1.0, "show_fps": false, "msaa": 1,
 		},
 		"audio": {"master": 0.9, "engine": 1.0, "effects": 1.0, "ambience": 0.6},
@@ -89,6 +89,33 @@ func load_settings() -> void:
 	if FileAccess.file_exists(SAVE_PATH):
 		load_status = "corrupt_reset"
 		# Preserve the corrupt original; defaults remain in memory until a real save.
+	else:
+		# First launch: pick a graphics preset that fits this phone. The player can change it any time.
+		var tier := device_tier(int(OS.get_memory_info().get("physical", 0)) / (1024 * 1024), OS.get_processor_count(),
+			RenderingServer.get_video_adapter_name() if DisplayServer.get_name() != "headless" else "", OS.has_feature("mobile"))
+		data["graphics"].merge(tier_graphics(tier), true)
+
+## 2 = flagship, 1 = mid-range, 0 = entry level. Desktop and unknown hardware count as flagship.
+static func device_tier(mem_mb: int, cores: int, adapter: String, mobile: bool) -> int:
+	if not mobile:
+		return 2
+	var gpu := adapter.to_lower()
+	# Adreno 7xx, Mali-G7xx / G715+, Immortalis, Apple GPUs: current high-end parts
+	var fast_gpu := false
+	for key in ["adreno (tm) 7", "adreno 7", "immortalis", "mali-g7", "mali-g8", "apple"]:
+		if gpu.contains(key):
+			fast_gpu = true
+	if mem_mb >= 7000 and cores >= 8 and fast_gpu:
+		return 2
+	if mem_mb >= 4500 and cores >= 6:
+		return 1
+	return 0
+
+static func tier_graphics(tier: int) -> Dictionary:
+	match tier:
+		2: return {"quality": "high", "render_scale": 0.85, "grass": 1.0}
+		1: return {"quality": "high", "render_scale": 0.7, "grass": 0.7}
+	return {"quality": "performance", "render_scale": 0.6, "grass": 0.4}
 
 func _backup_corrupt(txt: String) -> void:
 	var f := FileAccess.open(SAVE_PATH + ".corrupt.bak", FileAccess.WRITE)

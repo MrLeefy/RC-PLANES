@@ -269,7 +269,8 @@ func _tab_graphics() -> void:
 		graphics_changed.emit()))
 	vb.add_child(_check("Automatic resolution scaling (keeps frame rate)", bool(Settings.g("graphics", "auto_scale", true)), func(on): Settings.s("graphics", "auto_scale", on)))
 	vb.add_child(_check("Show performance overlay", bool(Settings.g("graphics", "show_fps", false)), func(on): Settings.s("graphics", "show_fps", on)))
-	vb.add_child(UITheme.label("Flight physics always run at 120 Hz regardless of graphics quality.", 17, UITheme.DIM))
+	vb.add_child(_check("Adaptive flight physics (saves battery and heat)", bool(Settings.g("graphics", "adaptive_physics", true)), func(on): Settings.s("graphics", "adaptive_physics", on)))
+	vb.add_child(UITheme.label("Physics run at 120 Hz. Only when the phone cannot keep up, and only while the plane is high in the air, they drop to 90 or 60 Hz; near the ground, on landing and in crashes they are always 120 Hz.", 17, UITheme.DIM))
 
 # ---------------------------------------------------------------- audio
 func _tab_audio() -> void:

@@ -2029,7 +2029,10 @@ func _finalize_meshes() -> void:
 		var mi := MeshInstance3D.new()
 		mi.name = "Mesh"
 		mi.mesh = mesh
-		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF if has_disc else GeometryInstance3D.SHADOW_CASTING_SETTING_ON
+		# Small parts (wheels, struts, cowl bits) add draws to every shadow cascade but are invisible in the shadow.
+		var ext := mesh.get_aabb().size
+		var tiny := maxf(ext.x, maxf(ext.y, ext.z)) < length * 0.09
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF if (has_disc or tiny) else GeometryInstance3D.SHADOW_CASTING_SETTING_ON
 		(p["node"] as Node3D).add_child(mi)
 		p["mesh"] = mi
 

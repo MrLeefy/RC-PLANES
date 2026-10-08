@@ -298,7 +298,20 @@ func focus_shadows(near_dist: float) -> void:
 # ================================================================ terrain
 func _build_terrain_async(progress: Callable) -> void:
 	terrain_mat = ShaderMaterial.new()
-	terrain_mat.shader = load("res://shaders/terrain.gdshader")
+	var baked := await TerrainBake.bake(self)
+	if baked.is_empty():
+		terrain_mat.shader = load("res://shaders/terrain.gdshader")   # procedural (no GPU to bake on)
+	else:
+		terrain_mat.shader = load("res://shaders/terrain_baked.gdshader")
+		terrain_mat.set_shader_parameter("bake_near", baked["near"])
+		terrain_mat.set_shader_parameter("bake_far", baked["far"])
+		terrain_mat.set_shader_parameter("detail_tex", baked["detail"])
+		terrain_mat.set_shader_parameter("near_rect", Vector4(TerrainBake.NEAR.position.x, TerrainBake.NEAR.position.y, TerrainBake.NEAR.size.x, TerrainBake.NEAR.size.y))
+		terrain_mat.set_shader_parameter("far_rect", Vector4(TerrainBake.FAR.position.x, TerrainBake.FAR.position.y, TerrainBake.FAR.size.x, TerrainBake.FAR.size.y))
+	var cloud_noise := await TerrainBake.sky_noise(self)
+	if cloud_noise:
+		sky_mat.set_shader_parameter("cloud_noise", cloud_noise)
+		sky_mat.set_shader_parameter("use_cloud_noise", true)
 	# collision: one heightfield (uniform scale -> Jolt friendly)
 	var body := StaticBody3D.new()
 	body.name = "TerrainBody"
