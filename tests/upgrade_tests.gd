@@ -259,7 +259,10 @@ func t_production_loop() -> void:
 			await get_tree().physics_frame
 			if fl.state == Flight.S.AFTERMATH: break
 		if fl.state != Flight.S.AFTERMATH:
-			valid = false; print("Cycle did not reach aftermath: ",cycle); break
+			valid = false
+			var ac_d: Aircraft = fl.aircraft
+			print("Cycle did not reach aftermath: ", cycle, " state=", fl.state, " pos=", ac_d.global_position, " vel=", ac_d.linear_velocity, " agl=", ac_d.agl, " hp0=", ac_d.comps[0]["hp"], " dmg=", ac_d.comps[0]["dmg_vis"], " crashed=", ac_d.crashed_flag, " breaks=", ac_d.recent_breaks.size(), " sim_t=", ac_d.sim_t)
+			break
 		await _frames(20)
 		for cut in fl.aircraft.build.get("fractures", []):
 			for node in cut["nodes"]: faces_ok = faces_ok or node.visible

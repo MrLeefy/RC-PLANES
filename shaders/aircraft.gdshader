@@ -28,7 +28,9 @@ void fragment() {
 	float m = 0.0;
 	vec3 g = vec3(0.0);
 	float pixel = max(max(fwidth(opos.x), fwidth(opos.y)), fwidth(opos.z));
-	float micro = 1.0 - smoothstep(0.0015, 0.012, pixel);
+	// fine foam/rubber grain (up to 170 cycles/m) turns into shimmering fur once it is only a few pixels
+	// wide, so it is faded out well before that and kept only for close-up views
+	float micro = 1.0 - smoothstep(0.0006, 0.0015, pixel);
 	if (kind == 0) {
 		float b = mix(0.5, n3(opos * 170.0), micro);
 		base *= 0.978 + 0.044 * b;

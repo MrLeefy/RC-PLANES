@@ -13,6 +13,7 @@ signal message(text: String)
 
 const RHO := 1.225
 const G := 9.81
+const CRASH_CLOSING_MPS := 15.0   # normal closing speed at a contact that is always a crash (≈54 km/h)
 
 var def: Dictionary
 var cfg: Dictionary
@@ -1221,6 +1222,8 @@ func _sweep_probes(state: PhysicsDirectBodyState3D, space: PhysicsDirectSpaceSta
 	last_contact_speed = closing
 	max_impact = maxf(max_impact, sev)
 	_damage(hit_ci, sev, hit_p, hit_n, kind)
+	if closing >= CRASH_CLOSING_MPS and damage_mode != "off" and not crashed_flag:
+		_crash({"sev": sev, "pos": hit_p, "cause": kind})
 	if sev > 25.0 and damage_mode == "physical":
 		_inertial_shock(sev * 6.0, hit_p)
 
@@ -1297,6 +1300,10 @@ func _contacts(state: PhysicsDirectBodyState3D) -> void:
 			last_contact_speed = v_rel.length()
 		max_impact = maxf(max_impact, sev)
 		_damage(ci, sev, pos, n, kind)
+		# a hit at full closing speed ends the flight even when the nose, prop or gear is what tears away:
+		# otherwise a steep dive can come to rest on the nose with the aircraft still "flying"
+		if closing >= CRASH_CLOSING_MPS and damage_mode != "off" and not crashed_flag:
+			_crash({"sev": sev, "pos": pos, "cause": kind})
 		# scraping wear is cosmetic (scuffs + grass stains); structure breaks from impacts
 		if tang > 1.0 and damage_mode != "off":
 			comps[ci]["dirt"] = clampf(float(comps[ci]["dirt"]) + tang * state.step * 0.08, 0.0, 1.0)
