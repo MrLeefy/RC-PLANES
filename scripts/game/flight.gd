@@ -331,6 +331,7 @@ func _cause_text(c: String) -> String:
 		"tail": return "tail section torn off"
 		"wings": return "lost both wings"
 		"breakup": return "airframe broke up"
+		"motor": return "motor torn off"
 		"cartwheel": return "cartwheeled in"
 		"tree": return "hit a tree"
 		"structure": return "hit a building"

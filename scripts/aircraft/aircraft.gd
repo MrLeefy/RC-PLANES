@@ -50,6 +50,9 @@ var ch_cmd = [0.0, 0.0, 0.0, 0.0]
 var servo_speed := 420.0
 var max_defl = [0.35, 0.35, 0.4, 0.6]
 var controls_enabled := true
+# sport assist: heading-hold gyro (integrated body rate since the stick was centred)
+var hold_roll := 0.0
+var hold_pitch := 0.0
 
 # battery / fuel
 var bat_cells := 4
@@ -955,8 +958,15 @@ func _mix_controls(dt: float, B: Basis, w_l: Vector3, air_l: Vector3) -> void:
 				pitch = minf(pitch, stall_margin * 4.0)
 			yaw = clampf(yaw + beta * 1.5 * gain - r_rate * 0.2 * gain, -1.0, 1.0)
 		"sport":
-			roll = clampf(roll - p_rate * 0.10 * gain * (1.0 - absf(in_roll)), -1.0, 1.0)
-			pitch = clampf(pitch - q_rate * 0.12 * gain * (1.0 - absf(in_pitch)), -1.0, 1.0)
+			# Like an RC stabiliser in heading-hold: with the stick centred the gyro keeps the
+			# attitude the pilot left, so lifting a thumb off a touch stick doesn't drift the plane.
+			var rel_r := 1.0 - clampf(absf(in_roll) / 0.12, 0.0, 1.0)
+			var rel_p := 1.0 - clampf(absf(in_pitch) / 0.12, 0.0, 1.0)
+			var holding := controls_enabled and not on_ground and airborne_time > 0.3
+			hold_roll = clampf(hold_roll - p_rate * dt, -0.5, 0.5) if holding and rel_r >= 1.0 else 0.0
+			hold_pitch = clampf(hold_pitch - q_rate * dt, -0.5, 0.5) if holding and rel_p >= 1.0 else 0.0
+			roll = clampf(roll - p_rate * 0.10 * gain * (1.0 - absf(in_roll)) + (hold_roll * 1.5 - p_rate * 0.12) * gain * rel_r, -1.0, 1.0)
+			pitch = clampf(pitch - q_rate * 0.12 * gain * (1.0 - absf(in_pitch)) + (hold_pitch * 4.0 - q_rate * 0.15) * gain * rel_p, -1.0, 1.0)
 			yaw = clampf(yaw - r_rate * 0.10 * gain * (1.0 - absf(in_yaw)) + beta * 0.3 * gain, -1.0, 1.0)
 		_:
 			pass
@@ -1517,7 +1527,10 @@ func _check_catastrophic(info: Dictionary) -> void:
 	var wings_gone := 0
 	var wings_total := 0
 	var tail_gone := false
+	var parts_gone := 0
 	for c in comps:
+		if c["detached"] and String(c["kind"]) != "prop":
+			parts_gone += 1
 		if String(c["kind"]) == "wing":
 			wings_total += 1
 			if c["detached"]:
@@ -1529,8 +1542,10 @@ func _check_catastrophic(info: Dictionary) -> void:
 		reason = "tail"
 	elif wings_total > 0 and wings_gone >= mini(2, wings_total):
 		reason = "wings"
-	elif recent_breaks.size() >= 3:
+	elif recent_breaks.size() >= 3 or parts_gone >= 4:
 		reason = "breakup"
+	elif engines.size() > 0 and engines.all(func(e): return not (e as Propulsion).mount_ok):
+		reason = "motor"
 	elif wings_gone >= 1 and agl < 2.0 and float(info.get("sev", 0.0)) > 8.0:
 		reason = "cartwheel"
 	if reason != "":
@@ -1620,6 +1635,8 @@ func place(xf: Transform3D, speed := 0.0) -> void:
 	curr_xf = xf
 	last_vel = v
 	contact_grace = 3
+	hold_roll = 0.0
+	hold_pitch = 0.0
 	for pn in panels:
 		pn.erase("sig_s")
 	for w2 in wheels:
@@ -1634,7 +1651,7 @@ func place(xf: Transform3D, speed := 0.0) -> void:
 const SNAPSHOT_RUNTIME := ["in_roll", "in_pitch", "in_yaw", "in_throttle", "brake", "controls_enabled", "assist", "damage_mode",
 	"bat_v", "total_current", "agl", "terrain_agl", "altitude_valid", "airspeed", "aoa", "beta", "ground_speed",
 	"on_ground", "wheels_touching", "airborne_time", "ground_time", "wing_cl", "g_load", "last_vel", "max_impact",
-	"last_contact_speed", "scrape_level", "last_impact_sfx", "_last_shock", "_body_ground_contact", "contact_grace", "_fol_F", "_fol_T"]
+	"last_contact_speed", "scrape_level", "hold_roll", "hold_pitch", "last_impact_sfx", "_last_shock", "_body_ground_contact", "contact_grace", "_fol_F", "_fol_T"]
 const WHEEL_RUNTIME := ["surface", "contact", "was_contact", "comp_now", "spin_rate", "steer_now", "peak", "peak_done", "last_peak_g"]
 
 func snapshot() -> Dictionary:

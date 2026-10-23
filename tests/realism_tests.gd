@@ -36,6 +36,7 @@ func _run_all() -> void:
 		if only == "" or id in only.split(","):
 			await t_aircraft(id)
 	await t_fuel_and_parts_change_mass()
+	await t_sport_attitude_hold()
 
 # ---------------------------------------------------------------- specs / mass
 func t_spec_sheets() -> void:
@@ -650,3 +651,28 @@ func t_fuel_and_parts_change_mass() -> void:
 	e.bat_soc = 0.12
 	var sag_v := Aircraft._ocv(0.12) * e.bat_cells - 30.0 * e.bat_r
 	_ok("mass: pack voltage sags with state of charge (LiPo curve)", sag_v < Aircraft._ocv(1.0) * e.bat_cells * 0.85 and float(full["thrust"]) > 5.0, "%.1f V vs %.1f V" % [sag_v, Aircraft._ocv(1.0) * e.bat_cells])
+
+# ---------------------------------------------------------------- touch-friendly assist
+## Sport assist must behave like a heading-hold gyro: thumbs off the sticks for 8 s keeps every
+## aircraft near the attitude it was left at (no runaway pitch-up, bank or stall).
+func t_sport_attitude_hold() -> void:
+	var bad := []
+	for id in AircraftDB.ids():
+		var a := await _spawn(id)
+		a.assist = "sport"
+		var vs := float(AircraftSpecs.compute(a.def, Settings.aircraft_cfg(id))["v_stall_clean_ms"])
+		_air(a, 150.0, vs * 2.0)
+		await _run(240, func(): _alt_hold(a, 150.0, 0.6))
+		var p0 := _att(a).y
+		var m := {"pitch": 0.0, "bank": 0.0, "v": 999.0}   # lambdas capture locals by value
+		await _run(120 * 8, func():
+			a.set_inputs(0.0, 0.0, 0.0, 0.6)
+			m["pitch"] = maxf(m["pitch"], absf(_att(a).y - p0))
+			m["bank"] = maxf(m["bank"], absf(_att(a).x))
+			m["v"] = minf(m["v"], a.airspeed))
+		var worst_pitch := float(m["pitch"])
+		var worst_bank := float(m["bank"])
+		var v_min := float(m["v"])
+		if worst_pitch > deg_to_rad(20.0) or worst_bank > deg_to_rad(15.0) or v_min < vs:
+			bad.append("%s dpitch=%.0f bank=%.0f vmin=%.1f" % [id, rad_to_deg(worst_pitch), rad_to_deg(worst_bank), v_min])
+	_ok("assist: sport holds attitude hands-off on all aircraft", bad.is_empty(), str(bad))
