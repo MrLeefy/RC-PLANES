@@ -1,0 +1,104 @@
+name: Android APK
+
+# Every push runs the full test suite and builds a signed APK.
+# Pushes to main also publish it as the newest GitHub Release, so this link always
+# serves the latest build:
+#   https://github.com/MrLeefy/RC-PLANES/releases/latest/download/RCPark.apk
+on:
+  push:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  GODOT_VERSION: 4.7.2
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - run: pip install cryptography==44.0.2
+
+      - name: Cache Godot
+        id: godot-cache
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/godot
+            ~/.local/share/godot/export_templates
+          key: godot-${{ env.GODOT_VERSION }}-android
+
+      - name: Install Godot ${{ env.GODOT_VERSION }} + Android templates
+        if: steps.godot-cache.outputs.cache-hit != 'true'
+        run: |
+          base=https://github.com/godotengine/godot-builds/releases/download/${GODOT_VERSION}-stable
+          mkdir -p ~/godot
+          curl -fsSL -o /tmp/godot.zip "$base/Godot_v${GODOT_VERSION}-stable_linux.x86_64.zip"
+          unzip -q /tmp/godot.zip -d ~/godot
+          mv ~/godot/Godot_v${GODOT_VERSION}-stable_linux.x86_64 ~/godot/godot
+          curl -fsSL -o /tmp/tpl.tpz "$base/Godot_v${GODOT_VERSION}-stable_export_templates.tpz"
+          tpl=~/.local/share/godot/export_templates/${GODOT_VERSION}.stable
+          mkdir -p "$tpl"
+          unzip -j -q /tmp/tpl.tpz 'templates/android_*' 'templates/version.txt' -d "$tpl"
+          rm /tmp/godot.zip /tmp/tpl.tpz
+
+      - name: Import project
+        run: ~/godot/godot --headless --editor --import --path . --quit
+
+      - name: Run tests
+        run: |
+          set -o pipefail
+          ~/godot/godot --headless --fixed-fps 120 --path . -- --upgrade-test 2>&1 | tee test.log | grep -E "^(PASS|FAIL)|===|SCRIPT ERROR"
+          if grep -qE "^FAIL|SCRIPT ERROR|Parse Error" test.log; then exit 1; fi
+
+      - name: Check signing secret
+        if: github.ref == 'refs/heads/main'
+        env:
+          RC_SIGNING_SEED: ${{ secrets.RC_SIGNING_SEED }}
+        run: |
+          if [ ${#RC_SIGNING_SEED} -lt 16 ]; then
+            echo "::error::Add a repository secret named RC_SIGNING_SEED (any password of 16+ characters) under Settings > Secrets and variables > Actions, then re-run. It keeps every release signed with the same key so updates install over each other."
+            exit 1
+          fi
+
+      - name: Build APK
+        env:
+          RC_SIGNING_SEED: ${{ secrets.RC_SIGNING_SEED }}
+        run: |
+          export GODOT=$HOME/godot/godot OUT=build/RCPark.apk
+          export VERSION_CODE=$((100 + GITHUB_RUN_NUMBER)) VERSION_NAME=0.11.$GITHUB_RUN_NUMBER
+          ci/build_android.sh
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: RCPark-${{ github.run_number }}
+          path: build/RCPark.apk
+          retention-days: 14
+
+      - name: Publish release
+        if: github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          tag=v0.11.${{ github.run_number }}
+          gh release create "$tag" build/RCPark.apk \
+            --target "$GITHUB_SHA" --latest \
+            --title "RC Park $tag" \
+            --notes "Automatic build of ${GITHUB_SHA::7}: $(git log -1 --format=%s)"

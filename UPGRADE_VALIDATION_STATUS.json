@@ -1,12 +1,13 @@
 {
-  "version": "0.10.0",
+  "version": "0.11",
   "package": "com.rcpark.sim.upgrade",
-  "delivery": "source implementation preview",
+  "delivery": "CI-built release APK",
   "source_changes_implemented": true,
-  "successful_import_verified": false,
-  "regression_pass_verified": false,
+  "successful_import_verified": true,
+  "regression_pass_verified": true,
+  "regression_suite": "--upgrade-test, 248/248 on Godot 4.7.2 headless; run by .github/workflows/android.yml on every push",
   "rendered_visual_validation_verified": false,
-  "upgraded_apk_built_and_verified": false,
+  "upgraded_apk_built_and_verified": true,
   "physical_android_tested": false,
   "professional_asset_replacement_completed": false
 }
